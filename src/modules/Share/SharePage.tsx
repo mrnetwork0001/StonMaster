@@ -145,8 +145,18 @@ export const SharePage: React.FC = () => {
 
   const estimatedOutput = useMemo(() => {
     const q = quote as any;
-    if (!q || (q.type !== 'quoteUpdated' && q.type !== 'quote_updated')) return '0';
-    return formatJettonAmount(q.quote?.askUnits || '0', toToken.decimals);
+    if (q) console.log('[SocialSwap] Raw quote:', JSON.stringify(q, null, 2));
+    if (!q) return null;
+    // Handle both possible event types
+    if (q.type === 'quoteUpdated' || q.type === 'quote_updated') {
+      const askUnits = q.quote?.askUnits || q.quote?.ask_units;
+      if (askUnits) return formatJettonAmount(askUnits, toToken.decimals);
+    }
+    // If the quote itself is a Quote object (no wrapping event)
+    if (q.askUnits || q.ask_units) {
+      return formatJettonAmount(q.askUnits || q.ask_units, toToken.decimals);
+    }
+    return null;
   }, [quote, toToken]);
 
   const generateLink = async () => {
@@ -458,7 +468,7 @@ export const SharePage: React.FC = () => {
 
             {/* Swap Preview / Quote */}
             {parseFloat(amount) > 0 && !id && (
-              <div style={{ padding: 'var(--space-4)', background: 'var(--color-surface)', borderRadius: 'var(--radius-md)', marginBottom: 'var(--space-6)' }}>
+              <div style={{ padding: 'var(--space-4)', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', marginBottom: 'var(--space-6)', boxShadow: 'var(--neu-inset-sm)' }}>
                 <div className="strategy-tokens" style={{ margin: 'var(--space-2) 0' }}>
                   <div className="strategy-token">
                     <span style={{ fontSize: '1.5rem' }}>{fromToken.icon}</span>
@@ -467,11 +477,20 @@ export const SharePage: React.FC = () => {
                   <div className="strategy-arrow">→</div>
                   <div className="strategy-token">
                     <span style={{ fontSize: '1.5rem' }}>{toToken.icon}</span>
-                    <strong style={{ color: 'var(--color-accent)' }}>
-                      {isQuoting ? '⏳ quoting...' : `~${estimatedOutput} ${toToken.symbol}`}
+                    <strong style={{ color: estimatedOutput ? 'var(--color-accent)' : 'var(--color-muted)' }}>
+                      {isQuoting
+                        ? '⏳ Fetching quote...'
+                        : estimatedOutput
+                          ? `~${estimatedOutput} ${toToken.symbol}`
+                          : '⚠️ Quote unavailable'}
                     </strong>
                   </div>
                 </div>
+                {!isQuoting && !estimatedOutput && (
+                  <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-muted)', textAlign: 'center', marginTop: 'var(--space-2)' }}>
+                    Omniston API may be temporarily down. You can still generate a strategy link — the recipient will get a live quote when they open it.
+                  </p>
+                )}
               </div>
             )}
 
