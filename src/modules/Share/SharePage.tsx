@@ -69,6 +69,8 @@ export const SharePage: React.FC = () => {
     const base = [...DEFAULT_TOKENS, ...customTokens];
     return base.filter(t => t.address !== fromToken.address);
   }, [fromToken, customTokens]);
+  // Pending token for confirmation
+  const [pendingToken, setPendingToken] = useState<(typeof DEFAULT_TOKENS)[0] | null>(null);
 
   // Discovery logic
   useEffect(() => {
@@ -76,19 +78,71 @@ export const SharePage: React.FC = () => {
       if (searchAddress.length < 40) return;
       
       const exists = [...DEFAULT_TOKENS, ...customTokens].find(t => t.address === searchAddress);
-      if (exists) return;
+      if (exists) {
+        // Token already in list — auto-select it
+        if (showCustomInput === 'from') setFromToken(exists);
+        if (showCustomInput === 'to') setToToken(exists);
+        setSearchAddress('');
+        setShowCustomInput(null);
+        return;
+      }
 
       setIsSearching(true);
       try {
         const meta = await fetchJettonMetadata(searchAddress);
         if (meta) {
-          setCustomTokens(prev => [...prev, { ...meta, icon: '🔵' }]);
-          setSearchAddress('');
+          const tokenWithIcon = { ...meta, icon: '🔵' } as (typeof DEFAULT_TOKENS)[0];
+          setPendingToken(tokenWithIcon);
           setModal({
             isOpen: true,
-            title: 'New Token Found! ✨',
-            type: 'success',
-            content: `Discovered ${meta.name} (${meta.symbol}). Verification: ${meta.verification}. You can now use it in your strategy.`
+            title: 'Token Found 🔍',
+            type: 'confirm',
+            content: (
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', padding: 'var(--space-4)', background: 'var(--color-bg)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--neu-inset-sm)' }}>
+                  <span style={{ fontSize: '2rem' }}>🔵</span>
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>{meta.name}</div>
+                    <div style={{ fontFamily: 'var(--font-mono)', fontSize: 'var(--text-sm)', color: 'var(--color-muted)' }}>{meta.symbol}</div>
+                  </div>
+                </div>
+                <div style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
+                  <strong>Verification:</strong>{' '}
+                  <span style={{ color: meta.verification === 'whitelist' ? 'var(--color-accent-secondary)' : 'var(--color-warning)' }}>
+                    {meta.verification === 'whitelist' ? '✅ Verified' : '⚠️ Unverified'}
+                  </span>
+                </div>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: 'var(--space-3)' }}>
+                  {searchAddress}
+                </div>
+                {meta.verification !== 'whitelist' && (
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius-sm)' }}>
+                    ⚠️ This token is not verified. Trade at your own risk.
+                  </div>
+                )}
+              </div>
+            ),
+            onConfirm: () => {
+              setCustomTokens(prev => [...prev, tokenWithIcon]);
+              if (showCustomInput === 'from') setFromToken(tokenWithIcon);
+              if (showCustomInput === 'to') setToToken(tokenWithIcon);
+              setSearchAddress('');
+              setShowCustomInput(null);
+              setPendingToken(null);
+              setModal({
+                isOpen: true,
+                title: 'Token Added ✅',
+                type: 'success',
+                content: `${meta.name} (${meta.symbol}) has been added to your token list.`,
+              });
+            },
+          });
+        } else {
+          setModal({
+            isOpen: true,
+            title: 'Token Not Found',
+            type: 'error',
+            content: 'Could not find a valid jetton at this address. Please check and try again.',
           });
         }
       } finally {
@@ -98,7 +152,7 @@ export const SharePage: React.FC = () => {
 
     const timer = setTimeout(search, 500);
     return () => clearTimeout(timer);
-  }, [searchAddress, customTokens]);
+  }, [searchAddress, customTokens, showCustomInput]);
 
   // 1. Fetch from Supabase if ID exists
   useEffect(() => {
@@ -581,7 +635,7 @@ export const SharePage: React.FC = () => {
         type={modal.type}
         onConfirm={modal.onConfirm}
         isLoading={creatingLink}
-        confirmLabel={modal.type === 'confirm' ? 'Confirm Trade' : 'Got it'}
+        confirmLabel={modal.type === 'confirm' ? (pendingToken ? '✅ Add to My List' : 'Confirm Trade') : 'Got it'}
       >
         {modal.content}
       </GlassModal>
