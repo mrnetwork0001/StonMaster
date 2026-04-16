@@ -55,6 +55,9 @@ export const SharePage: React.FC = () => {
   const [customTokens, setCustomTokens] = useState<typeof DEFAULT_TOKENS>([]);
   const [searchAddress, setSearchAddress] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  const [fromDropdownOpen, setFromDropdownOpen] = useState(false);
+  const [toDropdownOpen, setToDropdownOpen] = useState(false);
+  const [showCustomInput, setShowCustomInput] = useState<'from' | 'to' | null>(null);
 
   // Combined token list
   const allFromTokens = useMemo(() => {
@@ -303,54 +306,120 @@ export const SharePage: React.FC = () => {
 
             {!id ? (
               <>
-                {/* From Token Section */}
-                <div style={{ marginBottom: 'var(--space-6)' }}>
-                  <div className="section-header">
-                    <span className="input-label" style={{ marginBottom: 0 }}>From Token</span>
-                  </div>
-                  <div className="token-grid">
-                    {allFromTokens.map(token => (
-                      <button
-                        key={token.address}
-                        className={`token-btn ${fromToken.address === token.address ? 'active' : ''}`}
-                        onClick={() => setFromToken(token)}
-                      >
-                        <span style={{ fontSize: '1.2rem' }}>{token.icon || '💎'}</span>
-                        <span>{token.symbol}</span>
-                        {token.verification === 'whitelist' && <span style={{ color: 'var(--color-success)', fontSize: '10px' }}>✓</span>}
-                        {token.verification === 'none' && token.address !== TON_NATIVE_ADDRESS && <span style={{ opacity: 0.5, fontSize: '10px' }}>⚠️</span>}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* To Token Section */}
+                {/* From Token Dropdown */}
                 <div className="input-group" style={{ marginBottom: 'var(--space-6)' }}>
-                  <div className="section-header">
-                    <span className="input-label" style={{ marginBottom: 0 }}>To Token</span>
-                    <div className="search-pill">
-                      <input 
-                        placeholder="Paste contract address..." 
+                  <span className="input-label">From Token</span>
+                  <div className="token-dropdown-wrapper">
+                    <button
+                      className="token-dropdown-trigger"
+                      onClick={() => { setFromDropdownOpen(!fromDropdownOpen); setToDropdownOpen(false); }}
+                    >
+                      <span className="token-dropdown-selected">
+                        <span style={{ fontSize: '1.2rem' }}>{fromToken.icon || '💎'}</span>
+                        <span className="token-dropdown-name">{fromToken.symbol}</span>
+                        {fromToken.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
+                        {fromToken.verification === 'none' && fromToken.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
+                      </span>
+                      <span className={`token-dropdown-arrow ${fromDropdownOpen ? 'open' : ''}`}>▾</span>
+                    </button>
+
+                    {fromDropdownOpen && (
+                      <div className="token-dropdown-menu">
+                        {allFromTokens.map(token => (
+                          <button
+                            key={token.address}
+                            className={`token-dropdown-item ${fromToken.address === token.address ? 'active' : ''}`}
+                            onClick={() => { setFromToken(token); setFromDropdownOpen(false); }}
+                          >
+                            <span style={{ fontSize: '1.1rem' }}>{token.icon || '💎'}</span>
+                            <span className="token-dropdown-item-name">{token.name}</span>
+                            <span className="token-dropdown-item-symbol">{token.symbol}</span>
+                            {token.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
+                            {token.verification === 'none' && token.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
+                          </button>
+                        ))}
+                        <button
+                          className="token-dropdown-item token-dropdown-custom"
+                          onClick={() => { setShowCustomInput('from'); setFromDropdownOpen(false); }}
+                        >
+                          <span style={{ fontSize: '1.1rem' }}>📋</span>
+                          <span className="token-dropdown-item-name">Paste contract address</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {showCustomInput === 'from' && (
+                    <div className="token-custom-input-row">
+                      <input
+                        className="input"
+                        placeholder="EQ... or 0:... contract address"
                         value={searchAddress}
                         onChange={(e) => setSearchAddress(e.target.value)}
+                        autoFocus
                       />
-                      {isSearching && <span className="animate-spin" style={{ fontSize: '10px' }}>⏳</span>}
+                      {isSearching && <span style={{ fontSize: '12px' }}>⏳</span>}
+                      <button className="btn btn-sm btn-ghost" onClick={() => { setShowCustomInput(null); setSearchAddress(''); }}>✕</button>
                     </div>
+                  )}
+                </div>
+
+                {/* To Token Dropdown */}
+                <div className="input-group" style={{ marginBottom: 'var(--space-6)' }}>
+                  <span className="input-label">To Token</span>
+                  <div className="token-dropdown-wrapper">
+                    <button
+                      className="token-dropdown-trigger"
+                      onClick={() => { setToDropdownOpen(!toDropdownOpen); setFromDropdownOpen(false); }}
+                    >
+                      <span className="token-dropdown-selected">
+                        <span style={{ fontSize: '1.2rem' }}>{toToken.icon || '💰'}</span>
+                        <span className="token-dropdown-name">{toToken.symbol}</span>
+                        {toToken.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
+                        {toToken.verification === 'none' && toToken.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
+                      </span>
+                      <span className={`token-dropdown-arrow ${toDropdownOpen ? 'open' : ''}`}>▾</span>
+                    </button>
+
+                    {toDropdownOpen && (
+                      <div className="token-dropdown-menu">
+                        {allToTokens.map(token => (
+                          <button
+                            key={token.address}
+                            className={`token-dropdown-item ${toToken.address === token.address ? 'active' : ''}`}
+                            onClick={() => { setToToken(token); setToDropdownOpen(false); }}
+                          >
+                            <span style={{ fontSize: '1.1rem' }}>{token.icon || '💰'}</span>
+                            <span className="token-dropdown-item-name">{token.name}</span>
+                            <span className="token-dropdown-item-symbol">{token.symbol}</span>
+                            {token.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
+                            {token.verification === 'none' && token.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
+                          </button>
+                        ))}
+                        <button
+                          className="token-dropdown-item token-dropdown-custom"
+                          onClick={() => { setShowCustomInput('to'); setToDropdownOpen(false); }}
+                        >
+                          <span style={{ fontSize: '1.1rem' }}>📋</span>
+                          <span className="token-dropdown-item-name">Paste contract address</span>
+                        </button>
+                      </div>
+                    )}
                   </div>
-                  <div className="token-grid">
-                    {allToTokens.map(token => (
-                      <button
-                        key={token.address}
-                        className={`token-btn token-btn--accent ${toToken.address === token.address ? 'active' : ''}`}
-                        onClick={() => setToToken(token)}
-                      >
-                        <span style={{ fontSize: '1.2rem' }}>{token.icon || '💰'}</span>
-                        <span>{token.symbol}</span>
-                        {token.verification === 'whitelist' && <span style={{ color: 'var(--color-success)', fontSize: '10px' }}>✓</span>}
-                        {token.verification === 'none' && token.address !== TON_NATIVE_ADDRESS && <span style={{ opacity: 0.5, fontSize: '10px' }}>⚠️</span>}
-                      </button>
-                    ))}
-                  </div>
+
+                  {showCustomInput === 'to' && (
+                    <div className="token-custom-input-row">
+                      <input
+                        className="input"
+                        placeholder="EQ... or 0:... contract address"
+                        value={searchAddress}
+                        onChange={(e) => setSearchAddress(e.target.value)}
+                        autoFocus
+                      />
+                      {isSearching && <span style={{ fontSize: '12px' }}>⏳</span>}
+                      <button className="btn btn-sm btn-ghost" onClick={() => { setShowCustomInput(null); setSearchAddress(''); }}>✕</button>
+                    </div>
+                  )}
                 </div>
 
                 {/* Amount Input */}
@@ -506,37 +575,143 @@ export const SharePage: React.FC = () => {
           margin-bottom: var(--space-3);
         }
 
-        .search-pill {
+        /* Token Dropdown */
+        .token-dropdown-wrapper {
+          position: relative;
+        }
+
+        .token-dropdown-trigger {
+          width: 100%;
           display: flex;
           align-items: center;
+          justify-content: space-between;
+          padding: var(--space-3) var(--space-4);
+          background: var(--color-bg);
+          border-radius: var(--radius-md);
+          box-shadow: var(--neu-inset);
+          border: none;
+          cursor: pointer;
+          transition: all 300ms ease-out;
+          font-family: var(--font-sans);
+          font-size: var(--text-base);
+          color: var(--color-fg);
+          min-height: 48px;
+        }
+
+        .token-dropdown-trigger:hover {
+          box-shadow: var(--neu-inset-deep);
+        }
+
+        .token-dropdown-selected {
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+        }
+
+        .token-dropdown-name {
+          font-weight: 600;
+          font-size: var(--text-base);
+        }
+
+        .token-dropdown-arrow {
+          font-size: var(--text-sm);
+          color: var(--color-muted);
+          transition: transform 300ms ease-out;
+        }
+
+        .token-dropdown-arrow.open {
+          transform: rotate(180deg);
+        }
+
+        .token-dropdown-menu {
+          position: absolute;
+          top: calc(100% + 8px);
+          left: 0;
+          right: 0;
+          background: var(--color-bg);
+          border-radius: var(--radius-lg);
+          box-shadow: var(--neu-extruded-hover);
+          z-index: 50;
+          max-height: 280px;
+          overflow-y: auto;
+          padding: var(--space-2);
+        }
+
+        .token-dropdown-item {
+          width: 100%;
+          display: flex;
+          align-items: center;
+          gap: var(--space-3);
+          padding: var(--space-3) var(--space-4);
+          background: transparent;
+          border: none;
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          transition: all 200ms ease-out;
+          font-family: var(--font-sans);
+          font-size: var(--text-sm);
+          color: var(--color-fg);
+          text-align: left;
+        }
+
+        .token-dropdown-item:hover {
           background: var(--color-bg);
           box-shadow: var(--neu-inset-sm);
-          border-radius: var(--radius-full);
-          padding: 4px 16px;
-          transition: all 300ms ease-out;
         }
 
-        .search-pill:focus-within {
+        .token-dropdown-item.active {
           box-shadow: var(--neu-inset);
+          color: var(--color-accent);
+          font-weight: 600;
         }
 
-        .search-pill input {
-          background: none;
-          border: none;
-          color: var(--color-fg);
+        .token-dropdown-item-name {
+          flex: 1;
+          font-weight: 500;
+        }
+
+        .token-dropdown-item-symbol {
           font-family: var(--font-mono);
+          font-size: var(--text-xs);
+          color: var(--color-muted);
+        }
+
+        .token-dropdown-custom {
+          border-top: 1px solid rgba(163, 177, 198, 0.2);
+          margin-top: var(--space-1);
+          padding-top: var(--space-3);
+          color: var(--color-accent);
+        }
+
+        .token-dropdown-custom:hover {
+          color: var(--color-accent-light);
+        }
+
+        .token-verified-badge {
+          color: var(--color-accent-secondary);
           font-size: 11px;
-          outline: none;
-          width: 140px;
-          padding: 4px 0;
+          font-weight: 700;
         }
 
-        .search-pill input::placeholder {
-          color: var(--color-placeholder);
-          font-style: italic;
-          font-family: var(--font-sans);
+        .token-unverified-badge {
+          opacity: 0.5;
+          font-size: 11px;
         }
 
+        .token-custom-input-row {
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          margin-top: var(--space-3);
+        }
+
+        .token-custom-input-row .input {
+          flex: 1;
+          font-size: var(--text-sm);
+          padding: var(--space-2) var(--space-3);
+        }
+
+        /* Share Links */
         .share-link-box {
           padding: 14px 16px;
           display: flex;
