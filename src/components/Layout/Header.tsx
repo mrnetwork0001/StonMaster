@@ -3,7 +3,7 @@ import { TonConnectButton } from '@tonconnect/ui-react';
 import { useLocation } from 'react-router-dom';
 
 const pageTitles: Record<string, string> = {
-  '/': 'Mission Control',
+  '/app': 'Mission Control',
   '/sweep': 'StonSweep',
   '/earn': 'Yield Maximizer',
   '/share': 'SocialSwap',
@@ -19,11 +19,11 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
 
   return (
     <header className="header">
-      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
         <button
-          className="mobile-menu-btn btn btn-ghost btn-sm"
+          className="mobile-menu-btn"
           onClick={onMenuClick}
-          style={{ display: 'none' }}
+          aria-label="Open menu"
         >
           ☰
         </button>

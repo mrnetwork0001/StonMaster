@@ -146,16 +146,10 @@ export const Dashboard: React.FC = () => {
       )}
 
       {/* Health Gauge + Quick Actions */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: address ? '280px 1fr' : '1fr',
-        gap: 'var(--space-6)',
-        marginBottom: 'var(--space-6)',
-        alignItems: 'start',
-      }}>
+      <div className={`dashboard-grid ${address ? 'dashboard-grid--with-gauge' : ''}`}>
         {address && (
           <motion.div variants={itemVariants}>
-            <GlassCard style={{ display: 'flex', justifyContent: 'center' }}>
+            <GlassCard style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
               <WalletHealthGauge score={clutterScore} />
               {dustJettons.length > 0 && (
                 <div style={{

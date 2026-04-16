@@ -151,7 +151,7 @@ export const EarnPage: React.FC = () => {
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
       {/* Stats Cards */}
       <motion.div variants={itemVariants} initial="hidden" animate="visible" style={{ marginBottom: 'var(--space-6)' }}>
-        <div className="stats-grid" style={{ gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div className="stats-grid earn-stats-grid">
           {statItems.map((stat) => (
             <GlassCard key={stat.label}>
               <div className="stat-item">
@@ -189,7 +189,7 @@ export const EarnPage: React.FC = () => {
         </div>
       </motion.div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: 'var(--space-6)', alignItems: 'start' }}>
+      <div className="page-two-col">
         {/* Staking Panel */}
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <GlassCard glow="green">

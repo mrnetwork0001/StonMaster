@@ -241,7 +241,7 @@ export const SweepPage: React.FC = () => {
         </GlassCard>
       </motion.div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 'var(--space-6)', alignItems: 'start' }}>
+      <div className="page-two-col page-two-col--narrow">
         {/* Jetton List */}
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <GlassCard style={{ padding: 'var(--space-4)' }}>

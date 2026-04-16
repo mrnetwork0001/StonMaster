@@ -275,7 +275,7 @@ export const SharePage: React.FC = () => {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: id ? '1fr' : '1fr 400px', gap: 'var(--space-6)', alignItems: 'start', maxWidth: id ? '600px' : 'none', margin: id ? '0 auto' : '0' }}>
+      <div className={id ? 'page-single-col' : 'page-two-col'}>
         
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <GlassCard glow={id ? 'accent' : null}>
@@ -307,14 +307,6 @@ export const SharePage: React.FC = () => {
                 <div style={{ marginBottom: 'var(--space-6)' }}>
                   <div className="section-header">
                     <span className="input-label" style={{ marginBottom: 0 }}>From Token</span>
-                    <div className="search-pill">
-                      <input 
-                        placeholder="Paste contract address..." 
-                        value={searchAddress}
-                        onChange={(e) => setSearchAddress(e.target.value)}
-                      />
-                      {isSearching && <span className="animate-spin" style={{ fontSize: '10px' }}>⏳</span>}
-                    </div>
                   </div>
                   <div className="token-grid">
                     {allFromTokens.map(token => (
@@ -334,7 +326,17 @@ export const SharePage: React.FC = () => {
 
                 {/* To Token Section */}
                 <div className="input-group" style={{ marginBottom: 'var(--space-6)' }}>
-                  <span className="input-label">To Token</span>
+                  <div className="section-header">
+                    <span className="input-label" style={{ marginBottom: 0 }}>To Token</span>
+                    <div className="search-pill">
+                      <input 
+                        placeholder="Paste contract address..." 
+                        value={searchAddress}
+                        onChange={(e) => setSearchAddress(e.target.value)}
+                      />
+                      {isSearching && <span className="animate-spin" style={{ fontSize: '10px' }}>⏳</span>}
+                    </div>
+                  </div>
                   <div className="token-grid">
                     {allToTokens.map(token => (
                       <button
