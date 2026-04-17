@@ -180,29 +180,61 @@ export const UnifiedConnectButton: React.FC = () => {
             <div style={{ flex: 1, height: '1px', background: 'rgba(0,0,0,0.08)' }} />
           </div>
 
-          {/* Social / Email Login */}
+          {/* Social Login — Coming Soon */}
           <div
             style={{
               background: 'var(--color-bg)',
               borderRadius: 'var(--radius-lg)',
               padding: 'var(--space-5)',
-              boxShadow: 'var(--neu-extruded-sm)',
+              boxShadow: 'var(--neu-inset-sm)',
+              opacity: 0.75,
+              position: 'relative',
+              overflow: 'hidden',
             }}
           >
+            {/* Coming Soon badge */}
+            <div style={{
+              position: 'absolute',
+              top: '12px',
+              right: '12px',
+              background: 'linear-gradient(135deg, var(--color-accent), var(--color-accent-light))',
+              color: 'white',
+              fontSize: '0.65rem',
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              padding: '3px 10px',
+              borderRadius: 'var(--radius-full)',
+              textTransform: 'uppercase',
+            }}>
+              Coming Soon
+            </div>
+
             <h3 style={{ margin: '0 0 var(--space-2)', fontSize: '1rem', fontWeight: 700, color: 'var(--color-fg)' }}>
               Social Login
             </h3>
             <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              No wallet? Log in with your email or social account via Privy.
+              Sign in with email, Google, or Twitter — no wallet needed. A full TON embedded wallet will be provisioned automatically.
             </p>
             <button
-              className="btn btn-primary btn-full"
-              onClick={() => {
-                setShowModal(false);
-                login();
+              disabled
+              style={{
+                width: '100%',
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius-md)',
+                background: 'var(--color-bg)',
+                boxShadow: 'var(--neu-inset-sm)',
+                color: 'var(--color-muted)',
+                fontWeight: 600,
+                fontSize: '0.875rem',
+                cursor: 'not-allowed',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '8px',
+                border: 'none',
               }}
             >
-              Sign in with Social / Email
+              🔒 Sign in with Social / Email
             </button>
           </div>
 
