@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useTonAddress } from '@tonconnect/ui-react';
+import { useWallet } from './useWallet';
 import { fetchJettonBalances, fetchTonBalance, getJettonUsdValue } from '../services/tonapi';
 import type { JettonBalance } from '../services/tonapi';
 
@@ -9,7 +9,7 @@ export interface JettonWithValue extends JettonBalance {
 }
 
 export function useJettonBalances(dustThreshold: number = 1.0) {
-  const address = useTonAddress();
+  const { address } = useWallet();
   const [jettons, setJettons] = useState<JettonWithValue[]>([]);
   const [tonBalance, setTonBalance] = useState<string>('0');
   const [loading, setLoading] = useState(false);

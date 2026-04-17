@@ -1,5 +1,4 @@
 import React, { useState, useMemo } from 'react';
-import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../../components/common/GlassCard';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
@@ -7,8 +6,10 @@ import { useJettonBalances } from '../../hooks/useJettonBalances';
 import type { JettonWithValue } from '../../hooks/useJettonBalances';
 import { formatJettonAmount, formatUSD } from '../../utils/formatters';
 import { useOmniston } from '@ston-fi/omniston-sdk-react';
+import { useWallet } from '../../hooks/useWallet';
 import { GlassModal } from '../../components/common/GlassModal';
 import { TON_NATIVE_ADDRESS } from '../../utils/constants';
+import { Address, Cell } from '@ton/core';
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
@@ -24,8 +25,7 @@ interface SweepStep {
 }
 
 export const SweepPage: React.FC = () => {
-  const address = useTonAddress();
-  const [tonConnectUI] = useTonConnectUI();
+  const { address, sender } = useWallet();
   const omniston = useOmniston();
   const { jettons, dustJettons, totalDustValue, loading, refresh } = useJettonBalances();
   const [selected, setSelected] = useState<Set<string>>(new Set());
@@ -50,7 +50,7 @@ export const SweepPage: React.FC = () => {
     if (dustJettons.length > 0 && selected.size === 0) {
       setSelected(new Set(dustJettons.map(j => j.jetton.address)));
     }
-  }, [dustJettons]);
+  }, [dustJettons, selected.size]);
 
   const selectedJettons = useMemo(
     () => jettons.filter(j => selected.has(j.jetton.address)),
@@ -104,19 +104,18 @@ export const SweepPage: React.FC = () => {
       try {
         // 1. Get Quote (using direct instance for loop)
         const quotePromise = new Promise((resolve, reject) => {
-          // @ts-ignore - SDK type mismatch
-          const subscription = omniston.requestForQuote({
-            sourceTokenAddress: step.jetton.jetton.address,
-            destinationTokenAddress: TON_NATIVE_ADDRESS,
-            offerAmount: step.jetton.balance,
-          } as any).subscribe({
+          const subscription = (omniston as any).requestForQuote({
+            bidAssetAddress: step.jetton.jetton.address,
+            askAssetAddress: TON_NATIVE_ADDRESS,
+            amount: { unit: step.jetton.balance },
+          }).subscribe({
             next: (event: any) => {
               if (event.type === 'quoteUpdated') {
                 subscription.unsubscribe();
                 resolve(event);
               }
             },
-            error: (err) => reject(err),
+            error: (err: any) => reject(err),
           });
           // Timeout after 10s
           setTimeout(() => {
@@ -128,22 +127,24 @@ export const SweepPage: React.FC = () => {
         const quote: any = await quotePromise;
         
         // 2. Build Transaction
-        // @ts-ignore - SDK type mismatch
-        const params: any = await omniston.buildTransfer({
+        const tx = await omniston.buildTransfer({
+          sourceAddress: { blockchain: 607, address: address! },
+          destinationAddress: { blockchain: 607, address: address! },
           quote: quote.quote,
-          maxSlippagePps: "300",
-        } as any);
+          useRecommendedSlippage: true,
+        });
+
+        if (!tx.ton || !tx.ton.messages.length) {
+          throw new Error('No TON messages generated for this sweep');
+        }
+
+        const message = tx.ton.messages[0];
 
         // 3. Send Transaction
-        await tonConnectUI.sendTransaction({
-          validUntil: Math.floor(Date.now() / 1000) + 60,
-          messages: [
-            {
-              address: params.address?.address || params.to || "",
-              amount: params.amount || params.value || "0",
-              payload: params.payload,
-            },
-          ],
+        await sender.send({
+          to: Address.parse(message.targetAddress),
+          value: BigInt(message.sendAmount),
+          body: Cell.fromBoc(Buffer.from(message.payload, 'base64'))[0],
         });
 
         setSweepSteps(prev => prev.map((s, idx) =>

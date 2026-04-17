@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { useTonAddress } from '@tonconnect/ui-react';
 import { motion } from 'framer-motion';
+import { useWallet } from '../../hooks/useWallet';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
@@ -16,7 +16,7 @@ const itemVariants = {
 };
 
 export const EarnPage: React.FC = () => {
-  const address = useTonAddress();
+  const { address } = useWallet();
   const tonstakers = useTonstakers();
   const [activeTab, setActiveTab] = useState<Tab>('stake');
   const [unstakeMode, setUnstakeMode] = useState<UnstakeMode>('standard');

@@ -1,6 +1,4 @@
-import React from 'react';
-import { TonConnectButton } from '@tonconnect/ui-react';
-import { useLocation } from 'react-router-dom';
+import { UnifiedConnectButton } from '../common/UnifiedConnectButton';
 
 const pageTitles: Record<string, string> = {
   '/app': 'Mission Control',
@@ -30,7 +28,7 @@ export const Header: React.FC<HeaderProps> = ({ onMenuClick }) => {
         <h1 className="header-title">{title}</h1>
       </div>
       <div className="header-actions">
-        <TonConnectButton />
+        <UnifiedConnectButton />
       </div>
     </header>
   );

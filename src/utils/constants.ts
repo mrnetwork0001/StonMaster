@@ -3,8 +3,17 @@ export const TON_NATIVE_ADDRESS = 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 export const USDT_ADDRESS = 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs';
 export const TSTON_ADDRESS = 'EQC98_qAmNEptUtPc7W6xdHh_ZHrBUFpw5Ft_IzNU20QAJav';
 
+export interface Token {
+  address: string;
+  symbol: string;
+  name: string;
+  icon: string;
+  decimals: number;
+  verification: 'whitelist' | 'none' | 'blacklist';
+}
+
 // Default tokens for strategy builder
-export const DEFAULT_TOKENS = [
+export const DEFAULT_TOKENS: Token[] = [
   { address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c', symbol: 'TON', name: 'Toncoin', icon: '💎', decimals: 9, verification: 'whitelist' },
   { address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs', symbol: 'USDT', name: 'Tether USD', icon: '💵', decimals: 6, verification: 'whitelist' },
   { address: 'EQBynBO23ywHy_CgarY9NK9FTz0yDRg0KLF0Qf', symbol: 'NOT', name: 'Notcoin', icon: '🪙', decimals: 9, verification: 'whitelist' },
@@ -14,9 +23,9 @@ export const DEFAULT_TOKENS = [
 
 // API URLs
 export const TONAPI_BASE_URL = 'https://tonapi.io/v2';
+export const TONCENTER_API_URL = 'https://toncenter.com/api/v2';
 export const OMNISTON_WS_URL = 'wss://omni-ws.ston.fi';
 export const OMNISTON_SANDBOX_URL = 'wss://omni-ws-sandbox.ston.fi';
-export const STONFI_API_URL = 'https://api.ston.fi';
 
 // App Config
 export const APP_NAME = 'StonMaster';

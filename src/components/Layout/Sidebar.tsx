@@ -6,6 +6,7 @@ const navItems = [
   { path: '/sweep', label: 'StonSweep', icon: '🧹', exact: false },
   { path: '/earn', label: 'Yield Maximizer', icon: '💎', exact: false },
   { path: '/share', label: 'SocialSwap', icon: '🔗', exact: false },
+  { path: '/swap', label: 'Advanced Swap', icon: '⚡', exact: false },
 ];
 
 interface SidebarProps {

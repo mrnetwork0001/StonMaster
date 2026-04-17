@@ -1,6 +1,6 @@
 import React from 'react';
-import { useTonAddress } from '@tonconnect/ui-react';
 import { motion } from 'framer-motion';
+import { useWallet } from '../../hooks/useWallet';
 import { GlassCard } from '../common/GlassCard';
 import { AnimatedNumber } from '../common/AnimatedNumber';
 import { LoadingSkeleton } from '../common/LoadingSkeleton';
@@ -24,12 +24,17 @@ const itemVariants = {
 };
 
 export const Dashboard: React.FC = () => {
-  const address = useTonAddress();
+  const { address } = useWallet();
   const { tonBalance, totalDustValue, totalValue, clutterScore, dustJettons, loading } = useJettonBalances();
   const tonstakers = useTonstakers();
 
-  const tonUsd = nanoToTon(Number(tonBalance)) * (tonstakers.rates?.TONUSD || 3.42);
-  const totalPortfolioUsd = tonUsd + totalValue;
+  const tonUsd = useMemo(() => {
+    const balance = Number(tonBalance) || 0;
+    const rate = tonstakers?.rates?.TONUSD || 3.42;
+    return nanoToTon(balance) * rate;
+  }, [tonBalance, tonstakers?.rates?.TONUSD]);
+
+  const totalPortfolioUsd = tonUsd + (totalValue || 0);
 
   return (
     <motion.div

@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Tonstakers } from 'tonstakers-sdk';
-import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
+import { useWallet } from './useWallet';
 import { TONAPI_KEY, TONSTAKERS_PARTNER_CODE } from '../utils/constants';
 
 interface TonstakersState {
@@ -22,7 +23,7 @@ interface TonstakersState {
 
 export function useTonstakers() {
   const [tonConnectUI] = useTonConnectUI();
-  const address = useTonAddress();
+  const { address } = useWallet();
   
   const [state, setState] = useState<TonstakersState>({
     ready: false,

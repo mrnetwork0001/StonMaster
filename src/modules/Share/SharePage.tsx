@@ -1,14 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { useTonAddress, useTonConnectUI } from '@tonconnect/ui-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useParams, useNavigate } from 'react-router-dom';
+import { Address, Cell } from '@ton/core';
 import { createShortLink, getShortLink } from '../../services/supabase';
-import { useRfq } from '@ston-fi/omniston-sdk-react';
+import { useRfq, useOmniston } from '@ston-fi/omniston-sdk-react';
+import { useWallet } from '../../hooks/useWallet';
 import { formatJettonAmount } from '../../utils/formatters';
 import { DEFAULT_TOKENS, TON_NATIVE_ADDRESS } from '../../utils/constants';
+import type { Token } from '../../utils/constants';
 import { fetchJettonMetadata } from '../../services/tonapi';
 import { tonToNano, nanoToTon } from '../../utils/formatters';
 
@@ -20,16 +22,16 @@ const itemVariants = {
 };
 
 export const SharePage: React.FC = () => {
-  const address = useTonAddress();
+  const { address, sender } = useWallet();
   const { id } = useParams();
   const navigate = useNavigate();
-  const [tonConnectUI] = useTonConnectUI();
+  const omniston = useOmniston();
 
   const [isLoadingDb, setIsLoadingDb] = useState(!!id);
   const [dbError, setDbError] = useState<string | null>(null);
 
-  const [fromToken, setFromToken] = useState<any>(DEFAULT_TOKENS[0]);
-  const [toToken, setToToken] = useState<any>(DEFAULT_TOKENS[1]);
+  const [fromToken, setFromToken] = useState<Token>(DEFAULT_TOKENS[0]);
+  const [toToken, setToToken] = useState<Token>(DEFAULT_TOKENS[1]);
   const [amount, setAmount] = useState('');
   const [referrer, setReferrer] = useState<string | null>(null);
   
@@ -187,14 +189,12 @@ export const SharePage: React.FC = () => {
   // 2. Real-time Quote from Omniston
   const nanoAmount = fromToken.decimals === 9 ? tonToNano(parseFloat(amount) || 0) : (parseFloat(amount) * Math.pow(10, fromToken.decimals)).toString();
   
-  // @ts-ignore - SDK type mismatch with parameter names
   const { data: quote, isLoading: isQuoting } = useRfq({
-    sourceTokenAddress: fromToken.address,
-    destinationTokenAddress: toToken.address,
-    offerAmount: nanoAmount,
+    bidAssetAddress: fromToken.address,
+    askAssetAddress: toToken.address,
+    amount: { unit: nanoAmount },
   } as any, {
     enabled: parseFloat(amount) > 0,
-    refetchInterval: 10000,
   });
 
   const estimatedOutput = useMemo(() => {
@@ -279,22 +279,23 @@ export const SharePage: React.FC = () => {
       onConfirm: async () => {
         setCreatingLink(true);
         try {
-          // @ts-ignore
-          const params = await omniston.buildTransfer({
-            quote: quote.quote,
-            maxSlippagePps: "300", 
-            referrerAddress: referrer || undefined,
-            useRecommendedSlippage: false,
+          const tx = await omniston.buildTransfer({
+            sourceAddress: { blockchain: 607, address: address! },
+            destinationAddress: { blockchain: 607, address: address! },
+            quote: (quote as any).quote,
+            useRecommendedSlippage: true,
           });
 
-          // @ts-ignore
-          await tonConnectUI.sendTransaction({
-            validUntil: Math.floor(Date.now() / 1000) + 120,
-            messages: [{
-              address: params.address?.address || "",
-              amount: params.amount,
-              payload: params.payload,
-            }],
+          if (!tx.ton || !tx.ton.messages.length) {
+            throw new Error('No TON messages generated for this swap');
+          }
+
+          const message = tx.ton.messages[0];
+
+          await sender.send({
+            to: Address.parse(message.targetAddress),
+            value: BigInt(message.sendAmount),
+            body: Cell.fromBoc(Buffer.from(message.payload, 'base64'))[0],
           });
 
           setModal({

@@ -9,6 +9,8 @@ import { Dashboard } from './components/Dashboard/Dashboard';
 import { SweepPage } from './modules/Sweep/SweepPage';
 import { EarnPage } from './modules/Earn/EarnPage';
 import { SharePage } from './modules/Share/SharePage';
+import { AdvancedSwapPage } from './modules/AdvancedSwap/AdvancedSwapPage';
+import { PrivyProvider } from '@privy-io/react-auth';
 import { MANIFEST_URL } from './utils/constants';
 
 const queryClient = new QueryClient({
@@ -25,28 +27,44 @@ const App: React.FC = () => {
   const omniston = useMemo(() => new Omniston({ apiUrl: "wss://omni-ws.ston.fi" }), []);
 
   return (
-    <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
-      <QueryClientProvider client={queryClient}>
-        <OmnistonProvider omniston={omniston}>
-          <BrowserRouter>
-            <Routes>
-              {/* Landing page — no sidebar/header */}
-              <Route path="/" element={<LandingPage />} />
+    <PrivyProvider
+      appId={import.meta.env.VITE_PRIVY_APP_ID || 'insert_your_privy_app_id'}
+      config={{
+        appearance: {
+          theme: 'light',
+          accentColor: '#6C63FF',
+          logo: '/logo.png',
+          showWalletLoginFirst: false,
+        },
+        embeddedWallets: {
+          showWalletUIs: true,
+        },
+      }}
+    >
+      <TonConnectUIProvider manifestUrl={MANIFEST_URL}>
+        <QueryClientProvider client={queryClient}>
+          <OmnistonProvider omniston={omniston}>
+            <BrowserRouter>
+              <Routes>
+                {/* Landing page — no sidebar/header */}
+                <Route path="/" element={<LandingPage />} />
 
-              {/* Main app with sidebar layout */}
-              <Route element={<AppLayout />}>
-                <Route path="/app" element={<Dashboard />} />
-                <Route path="/sweep" element={<SweepPage />} />
-                <Route path="/earn" element={<EarnPage />} />
-                <Route path="/share" element={<SharePage />} />
-                {/* Short link handler */}
-                <Route path="/s/:id" element={<SharePage />} />
-              </Route>
-            </Routes>
-          </BrowserRouter>
-        </OmnistonProvider>
-      </QueryClientProvider>
-    </TonConnectUIProvider>
+                {/* Main app with sidebar layout */}
+                <Route element={<AppLayout />}>
+                  <Route path="/app" element={<Dashboard />} />
+                  <Route path="/sweep" element={<SweepPage />} />
+                  <Route path="/earn" element={<EarnPage />} />
+                  <Route path="/share" element={<SharePage />} />
+                  <Route path="/swap" element={<AdvancedSwapPage />} />
+                  {/* Short link handler */}
+                  <Route path="/s/:id" element={<SharePage />} />
+                </Route>
+              </Routes>
+            </BrowserRouter>
+          </OmnistonProvider>
+        </QueryClientProvider>
+      </TonConnectUIProvider>
+    </PrivyProvider>
   );
 };
 

@@ -1,4 +1,25 @@
-import { TONAPI_BASE_URL, TONAPI_KEY } from '../utils/constants';
+import { TONAPI_BASE_URL, TONAPI_KEY, TONCENTER_API_URL } from '../utils/constants';
+
+/**
+ * Helper for retrying fetches
+ */
+async function fetchWithRetry(url: string, options: RequestInit, retries = 2): Promise<Response> {
+  try {
+    const response = await fetch(url, options);
+    if (response.ok) return response;
+    if (retries > 0 && (response.status === 429 || response.status >= 500)) {
+      await new Promise(r => setTimeout(r, 1000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 1000));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw error;
+  }
+}
 
 export interface JettonBalance {
   balance: string;
@@ -145,7 +166,7 @@ export async function fetchJettonBalances(address: string): Promise<JettonBalanc
   }
 
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `${TONAPI_BASE_URL}/accounts/${address}/jettons?currencies=usd`,
       { headers }
     );
@@ -167,18 +188,46 @@ export async function fetchTonBalance(address: string): Promise<string> {
     return '5250000000'; // 5.25 TON mock
   }
 
+  // 1. Try TonAPI first
   try {
-    const response = await fetch(
+    const response = await fetchWithRetry(
       `${TONAPI_BASE_URL}/accounts/${address}`,
       { headers }
     );
-    if (!response.ok) throw new Error(`TonAPI error: ${response.status}`);
-    const data: AccountInfo = await response.json();
-    return data.balance;
+    if (response.ok) {
+      const data: AccountInfo = await response.json();
+      return data.balance;
+    }
+    console.warn(`TonAPI failed (${response.status}), trying Toncenter fallback...`);
   } catch (error) {
-    console.error('Failed to fetch TON balance:', error);
-    return '0';
+    console.warn('TonAPI request failed, trying Toncenter fallback:', error);
   }
+
+  // 2. Fallback to Toncenter
+  try {
+    const response = await fetch(
+      `${TONCENTER_API_URL}/jsonRPC`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: 1,
+          jsonrpc: '2.0',
+          method: 'getAddressInformation',
+          params: { address }
+        })
+      }
+    );
+    if (!response.ok) throw new Error(`Toncenter error: ${response.status}`);
+    const data = await response.json();
+    if (data.result) {
+      return data.result.balance || '0';
+    }
+  } catch (error) {
+    console.error('All balance fetchers failed:', error);
+  }
+
+  return '0';
 }
 
 /**
