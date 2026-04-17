@@ -178,10 +178,11 @@ export const SweepPage: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = await (omniston as any).buildTransfer({
       quote,
-      sourceAddress:      { blockchain: Blockchain.TON, address: addr },
-      destinationAddress: { blockchain: Blockchain.TON, address: addr },
-      refundAddress:      { blockchain: Blockchain.TON, address: addr },
-      excessAddress:      { blockchain: Blockchain.TON, address: addr },
+      sourceAddress:        { blockchain: Blockchain.TON, address: addr },
+      destinationAddress:   { blockchain: Blockchain.TON, address: addr },
+      refundAddress:        { blockchain: Blockchain.TON, address: addr },
+      excessAddress:        { blockchain: Blockchain.TON, address: addr },
+      useRecommendedSlippage: true, // required by Omniston SDK
     });
     if (!tx?.ton?.messages?.length) throw new Error('No messages returned — token may not be swappable');
     const msg = tx.ton.messages[0];
