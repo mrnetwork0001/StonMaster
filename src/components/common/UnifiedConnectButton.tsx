@@ -65,33 +65,49 @@ export const UnifiedConnectButton: React.FC = () => {
           title="Wallet Options"
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
-            {/* Full address display */}
+            {/* Address display — show email label or TON address */}
             <div
               style={{
                 background: 'var(--color-bg)',
                 borderRadius: 'var(--radius-md)',
                 padding: 'var(--space-3) var(--space-4)',
                 boxShadow: 'var(--neu-inset-sm)',
-                fontFamily: 'var(--font-mono)',
+                fontFamily: address.includes('@') ? 'var(--font-sans)' : 'var(--font-mono)',
                 fontSize: '0.8rem',
                 color: 'var(--color-fg)',
                 wordBreak: 'break-all',
               }}
             >
-              {address}
+              {address.includes('@') ? `📧 ${address}` : address}
             </div>
 
-            {/* Copy Address */}
-            <button
-              className="btn btn-ghost btn-full"
-              onClick={async () => {
-                await navigator.clipboard.writeText(address);
-                setShowModal(false);
-              }}
-              style={{ justifyContent: 'flex-start', gap: 'var(--space-3)' }}
-            >
-              <span>📋</span> Copy Address
-            </button>
+            {/* Copy Address — only for real wallet addresses */}
+            {!address.includes('@') && (
+              <button
+                className="btn btn-ghost btn-full"
+                onClick={async () => {
+                  await navigator.clipboard.writeText(address);
+                  setShowModal(false);
+                }}
+                style={{ justifyContent: 'flex-start', gap: 'var(--space-3)' }}
+              >
+                <span>📋</span> Copy Address
+              </button>
+            )}
+
+            {/* Social login note */}
+            {address.includes('@') && (
+              <div style={{
+                fontSize: '0.75rem',
+                color: 'var(--color-muted)',
+                padding: 'var(--space-2) var(--space-3)',
+                background: 'var(--color-warning-soft)',
+                borderRadius: 'var(--radius-md)',
+                lineHeight: 1.5,
+              }}>
+                ⚠️ Social login provides identity only. Connect a <strong>TON wallet</strong> (Tonkeeper) to execute swaps and transactions.
+              </div>
+            )}
 
             {/* Disconnect */}
             <button
