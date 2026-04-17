@@ -1,5 +1,6 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { GlassCard } from '../../components/common/GlassCard';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useJettonBalances } from '../../hooks/useJettonBalances';
@@ -8,31 +9,67 @@ import { formatJettonAmount, formatUSD } from '../../utils/formatters';
 import { useOmniston } from '@ston-fi/omniston-sdk-react';
 import { useWallet } from '../../hooks/useWallet';
 import { GlassModal } from '../../components/common/GlassModal';
-import { TON_NATIVE_ADDRESS } from '../../utils/constants';
-import { Address, Cell } from '@ton/core';
+import { TON_NATIVE_ADDRESS, TONAPI_BASE_URL, TONAPI_KEY, DEFAULT_SLIPPAGE_BPS } from '../../utils/constants';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+/** Wallet v3/v4 support max 4 outgoing messages per external tx. Wallet v5 supports up to 255. */
+const BATCH_SIZE = 4;
+/** How long to wait between polling attempts (ms) */
+const POLL_INTERVAL = 2500;
+/** Max time to wait for on-chain confirmation before timing out (ms) */
+const CONFIRMATION_TIMEOUT = 60_000;
+
+// ─── Types ────────────────────────────────────────────────────────────────────
+type StepStatus = 'pending' | 'quoting' | 'building' | 'sending' | 'confirming' | 'done' | 'error';
+type SweepStatus = 'idle' | 'quoting' | 'sending' | 'confirming' | 'done';
+
+interface SweepStep {
+  jetton: JettonWithValue;
+  status: StepStatus;
+  error?: string;
+}
+
+interface TcMessage {
+  address: string;
+  amount: string;
+  payload: string; // base64 cell
+}
+
+interface PreparedMessage {
+  idx: number;
+  msg: TcMessage;
+}
 
 const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   visible: { opacity: 1, y: 0, transition: { duration: 0.4, ease: [0.16, 1, 0.3, 1] as const } },
 };
 
-type SweepStatus = 'idle' | 'scanning' | 'ready' | 'sweeping' | 'done';
-
-interface SweepStep {
-  jetton: JettonWithValue;
-  status: 'pending' | 'processing' | 'done' | 'error';
-  error?: string;
+// ─── Step status icon map ─────────────────────────────────────────────────────
+function StepIcon({ status }: { status: StepStatus }) {
+  switch (status) {
+    case 'quoting':    return <span className="animate-spin" style={{ fontSize: '1em' }}>🔍</span>;
+    case 'building':   return <span className="animate-spin" style={{ fontSize: '1em' }}>📦</span>;
+    case 'sending':    return <span className="animate-spin" style={{ fontSize: '1em' }}>✍️</span>;
+    case 'confirming': return <span className="animate-spin" style={{ fontSize: '1em' }}>🔄</span>;
+    case 'done':       return <>✅</>;
+    case 'error':      return <>❌</>;
+    default:           return <>⏳</>;
+  }
 }
 
+// ─── Component ────────────────────────────────────────────────────────────────
 export const SweepPage: React.FC = () => {
-  const { address, sender } = useWallet();
+  const { address } = useWallet();
+  const [tonConnectUI] = useTonConnectUI();
   const omniston = useOmniston();
   const { jettons, dustJettons, totalDustValue, loading, refresh } = useJettonBalances();
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [sweepStatus, setSweepStatus] = useState<SweepStatus>('idle');
-  const [sweepSteps, setSweepSteps] = useState<SweepStep[]>([]);
-  const [currentStep, setCurrentStep] = useState(0);
-  // Guard so auto-select dust runs exactly once after first load, never after user changes
+
+  const [selected, setSelected]         = useState<Set<string>>(new Set());
+  const [sweepStatus, setSweepStatus]   = useState<SweepStatus>('idle');
+  const [sweepSteps, setSweepSteps]     = useState<SweepStep[]>([]);
+  const [statusMessage, setStatusMessage] = useState('');
+
   const hasAutoSelected = useRef(false);
 
   const [modal, setModal] = useState<{
@@ -40,16 +77,9 @@ export const SweepPage: React.FC = () => {
     title: string;
     content: React.ReactNode;
     type: 'info' | 'success' | 'error';
-  }>({
-    isOpen: false,
-    title: '',
-    content: null,
-    type: 'info'
-  });
+  }>({ isOpen: false, title: '', content: null, type: 'info' });
 
-  // Auto-select dust tokens exactly ONCE when they first load.
-  // We deliberately do NOT watch selected.size — watching it caused Clear and
-  // manual deselection to immediately re-trigger this effect and re-select dust.
+  // ─── Auto-select dust ONCE on first load ─────────────────────────────────
   React.useEffect(() => {
     if (dustJettons.length > 0 && !hasAutoSelected.current) {
       hasAutoSelected.current = true;
@@ -57,156 +87,252 @@ export const SweepPage: React.FC = () => {
     }
   }, [dustJettons]);
 
+  // ─── Selection helpers ────────────────────────────────────────────────────
   const selectedJettons = useMemo(
     () => jettons.filter(j => selected.has(j.jetton.address)),
     [jettons, selected]
   );
-
   const selectedTotalValue = useMemo(
     () => selectedJettons.reduce((sum, j) => sum + j.usdValue, 0),
     [selectedJettons]
   );
+  const toggleSelect  = (addr: string) => setSelected(prev => { const n = new Set(prev); n.has(addr) ? n.delete(addr) : n.add(addr); return n; });
+  const selectAllDust = () => setSelected(new Set(dustJettons.map(j => j.jetton.address)));
+  const selectAll     = () => setSelected(new Set(jettons.map(j => j.jetton.address)));
+  const clearSelection = () => setSelected(new Set());
 
-  const toggleSelect = (address: string) => {
-    setSelected(prev => {
-      const next = new Set(prev);
-      if (next.has(address)) next.delete(address);
-      else next.add(address);
-      return next;
+  // ─── TonAPI helpers ───────────────────────────────────────────────────────
+  const apiHeaders = useCallback((): Record<string, string> => {
+    if (TONAPI_KEY && TONAPI_KEY !== 'mock_tonapi_key_replace_me')
+      return { Authorization: `Bearer ${TONAPI_KEY}` };
+    return {};
+  }, []);
+
+  /** Returns the logical time (lt) of the most recent tx for the wallet, used as a sync point for polling. */
+  const getLatestTxLt = useCallback(async (): Promise<string | null> => {
+    if (!address) return null;
+    try {
+      const r = await fetch(
+        `${TONAPI_BASE_URL}/blockchain/accounts/${address}/transactions?limit=1`,
+        { headers: apiHeaders() }
+      );
+      if (!r.ok) return null;
+      const d = await r.json();
+      return d.transactions?.[0]?.lt?.toString() ?? null;
+    } catch { return null; }
+  }, [address, apiHeaders]);
+
+  /** Poll TonAPI until a new tx with a different lt appears, or the timeout is reached. */
+  const pollForConfirmation = useCallback(async (prevLt: string | null): Promise<boolean> => {
+    const deadline = Date.now() + CONFIRMATION_TIMEOUT;
+    while (Date.now() < deadline) {
+      await new Promise(r => setTimeout(r, POLL_INTERVAL));
+      const lt = await getLatestTxLt();
+      if (lt !== null && lt !== prevLt) return true;
+    }
+    return false;
+  }, [getLatestTxLt]);
+
+  // ─── Omniston helpers ─────────────────────────────────────────────────────
+  /** Fetch a swap quote from Omniston with the correct v2 API parameters. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getQuote = useCallback((jetton: JettonWithValue): Promise<any> =>
+    new Promise((resolve, reject) => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sub = (omniston as any).requestForQuote({
+        settlementMethods: ['SWAP'],
+        offerAssetAddress: { blockchain: 'TON', address: jetton.jetton.address },
+        askAssetAddress:   { blockchain: 'TON', address: TON_NATIVE_ADDRESS },
+        amount: { offerUnits: jetton.balance }, // already in smallest unit from TonAPI
+        settlementParams: { maxPriceSlippageBps: DEFAULT_SLIPPAGE_BPS },
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }).subscribe({
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        next: (event: any) => {
+          if (event.type === 'quoteUpdated') {
+            sub.unsubscribe();
+            resolve(event.quote); // resolve with the quote object, not the wrapper event
+          }
+        },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        error: (e: any) => reject(e),
+      });
+      setTimeout(() => {
+        sub.unsubscribe();
+        reject(new Error('No route found (quote timeout). Token may lack sufficient liquidity.'));
+      }, 12_000);
+    }), [omniston]);
+
+  /** Build a TonConnect message from an Omniston quote. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const buildTonMessage = useCallback(async (quote: any, addr: string): Promise<TcMessage> => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const tx = await (omniston as any).buildTransfer({
+      quote,
+      sourceAddress:      { blockchain: 'TON', address: addr },
+      destinationAddress: { blockchain: 'TON', address: addr },
+      refundAddress:      { blockchain: 'TON', address: addr },
+      excessAddress:      { blockchain: 'TON', address: addr },
     });
-  };
+    if (!tx?.ton?.messages?.length) throw new Error('No messages returned — token may not be swappable');
+    const msg = tx.ton.messages[0];
+    return { address: msg.targetAddress, amount: msg.sendAmount, payload: msg.payload };
+  }, [omniston]);
 
-  const selectAllDust = () => {
-    setSelected(new Set(dustJettons.map(j => j.jetton.address)));
-  };
-
-  const selectAll = () => {
-    setSelected(new Set(jettons.map(j => j.jetton.address)));
-  };
-
-  const clearSelection = () => {
-    setSelected(new Set());
-  };
-
+  // ─── Main sweep handler ───────────────────────────────────────────────────
   const startSweep = async () => {
-    if (selectedJettons.length === 0 || !address) return;
+    if (selectedJettons.length === 0 || !address || !tonConnectUI) return;
 
-    const steps: SweepStep[] = selectedJettons.map(j => ({
-      jetton: j,
-      status: 'pending' as const,
-    }));
+    const initialSteps: SweepStep[] = selectedJettons.map(j => ({ jetton: j, status: 'pending' }));
+    setSweepSteps(initialSteps);
+    setSweepStatus('quoting');
+    setStatusMessage(`Getting best routes for ${selectedJettons.length} token${selectedJettons.length > 1 ? 's' : ''}…`);
 
-    setSweepSteps(steps);
-    setSweepStatus('sweeping');
+    // ── Phase 1: Fetch all quotes in parallel ──────────────────────────────
+    const updateStep = (i: number, patch: Partial<SweepStep>) =>
+      setSweepSteps(prev => prev.map((s, idx) => idx === i ? { ...s, ...patch } : s));
 
-    for (let i = 0; i < steps.length; i++) {
-      const step = steps[i];
-      setCurrentStep(i);
-      setSweepSteps(prev => prev.map((s, idx) =>
-        idx === i ? { ...s, status: 'processing' } : s
-      ));
+    selectedJettons.forEach((_, i) => updateStep(i, { status: 'quoting' }));
+
+    const quoteResults = await Promise.allSettled(
+      selectedJettons.map(async (jetton, i) => {
+        try {
+          const quote = await getQuote(jetton);
+          updateStep(i, { status: 'building' });
+          return { quote, idx: i };
+        } catch (e) {
+          updateStep(i, { status: 'error', error: e instanceof Error ? e.message : 'Quote failed' });
+          throw e;
+        }
+      })
+    );
+
+    // ── Phase 2: Build TonConnect messages for successful quotes ───────────
+    setSweepStatus('sending');
+    setStatusMessage('Building swap transactions…');
+
+    const msgResults = await Promise.allSettled(
+      quoteResults.map(async (r, i) => {
+        if (r.status === 'rejected') throw r.reason; // already error-marked above
+        try {
+          const msg = await buildTonMessage(r.value.quote, address);
+          return { msg, idx: i } as PreparedMessage;
+        } catch (e) {
+          updateStep(i, { status: 'error', error: e instanceof Error ? e.message : 'Build failed' });
+          throw e;
+        }
+      })
+    );
+
+    const readyMessages: PreparedMessage[] = msgResults
+      .filter((r): r is PromiseFulfilledResult<PreparedMessage> => r.status === 'fulfilled')
+      .map(r => r.value);
+
+    if (readyMessages.length === 0) {
+      setSweepStatus('done');
+      setModal({ isOpen: true, title: '❌ No Routes Found', type: 'error',
+        content: <p>None of the selected tokens could be routed through Omniston. They may have insufficient liquidity on TON DEXes.</p>
+      });
+      return;
+    }
+
+    // ── Phase 3: Chunk into groups of BATCH_SIZE and send each as one tx ───
+    const batches: PreparedMessage[][] = [];
+    for (let i = 0; i < readyMessages.length; i += BATCH_SIZE) {
+      batches.push(readyMessages.slice(i, i + BATCH_SIZE));
+    }
+
+    const successIdxs: number[] = [];
+    const batchCount = batches.length;
+
+    for (let b = 0; b < batchCount; b++) {
+      const batch = batches[b];
+      const batchLabel = batchCount > 1 ? ` (batch ${b + 1}/${batchCount})` : '';
+
+      // Capture current lt BEFORE sending so we can detect the new tx
+      const preSendLt = await getLatestTxLt();
+
+      setStatusMessage(`Sign the transaction in your wallet${batchLabel}…`);
+      batch.forEach(({ idx }) => updateStep(idx, { status: 'sending' }));
 
       try {
-        // 1. Get Quote (using direct instance for loop)
-        const quotePromise = new Promise((resolve, reject) => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const subscription = (omniston as any).requestForQuote({
-            bidAssetAddress: step.jetton.jetton.address,
-            askAssetAddress: TON_NATIVE_ADDRESS,
-            amount: { unit: step.jetton.balance },
-          }).subscribe({
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            next: (event: any) => {
-              if (event.type === 'quoteUpdated') {
-                subscription.unsubscribe();
-                resolve(event);
-              }
-            },
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            error: (err: any) => reject(err),
-          });
-          // Timeout after 10s
-          setTimeout(() => {
-            subscription.unsubscribe();
-            reject(new Error('Quote timeout'));
-          }, 10000);
+        await tonConnectUI.sendTransaction({
+          validUntil: Math.floor(Date.now() / 1000) + 300,
+          messages: batch.map(({ msg }) => ({
+            address: msg.address,
+            amount:  msg.amount,
+            payload: msg.payload,
+          })),
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const quote: any = await quotePromise;
-        
-        // 2. Build Transaction
-        const tx = await omniston.buildTransfer({
-          sourceAddress: { blockchain: 607, address: address! },
-          destinationAddress: { blockchain: 607, address: address! },
-          quote: quote.quote,
-          useRecommendedSlippage: true,
+        // ── Phase 4: Poll for on-chain confirmation ────────────────────────
+        setSweepStatus('confirming');
+        setStatusMessage(`Confirming on TON blockchain${batchLabel}…`);
+        batch.forEach(({ idx }) => updateStep(idx, { status: 'confirming' }));
+
+        const confirmed = await pollForConfirmation(preSendLt);
+
+        batch.forEach(({ idx }) => {
+          if (confirmed) {
+            updateStep(idx, { status: 'done' });
+          } else {
+            // tx was submitted but we timed out waiting — mark done with note
+            updateStep(idx, { status: 'done', error: 'Submitted (confirmation timed out — check wallet)' });
+          }
+          successIdxs.push(idx);
         });
 
-        if (!tx.ton || !tx.ton.messages.length) {
-          throw new Error('No TON messages generated for this sweep');
-        }
-
-        const message = tx.ton.messages[0];
-
-        // 3. Send Transaction
-        await sender.send({
-          to: Address.parse(message.targetAddress),
-          value: BigInt(message.sendAmount),
-          body: Cell.fromBoc(Buffer.from(message.payload, 'base64'))[0],
-        });
-
-        setSweepSteps(prev => prev.map((s, idx) =>
-          idx === i ? { ...s, status: 'done' } : s
-        ));
-      } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
-        console.error(`Sweep failed for ${step.jetton.jetton.symbol}:`, err);
-        setSweepSteps(prev => prev.map((s, idx) =>
-          idx === i ? { ...s, status: 'error', error: err.message || 'Transaction failed' } : s
-        ));
-        // Pause briefly before next step to avoid spamming if user cancelled
-        await new Promise(r => setTimeout(r, 1000));
+      } catch {
+        // User cancelled wallet popup or sendTransaction threw
+        batch.forEach(({ idx }) => updateStep(idx, { status: 'error', error: 'Transaction rejected or cancelled' }));
       }
     }
 
+    // ── Phase 5: Show final summary ────────────────────────────────────────
     setSweepStatus('done');
-    
-    const successes = steps.filter(s => s.status === 'done').length;
-    const fails = steps.filter(s => s.status === 'error').length;
+    setStatusMessage('');
+
+    const totalSelected = selectedJettons.length;
+    const successCount  = successIdxs.length;
+    const failCount     = totalSelected - successCount;
 
     setModal({
       isOpen: true,
-      title: 'Sweep Complete! 🧹',
-      type: successes > 0 ? 'success' : 'error',
+      title: successCount > 0 ? '🧹 Sweep Complete!' : '❌ Sweep Failed',
+      type: successCount > 0 ? 'success' : 'error',
       content: (
         <div>
-          <p>The sweeping process has finished.</p>
+          <p>Sweeping process has finished.</p>
           <div style={{ marginTop: 'var(--space-4)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between' }}>
               <span>Successfully swept:</span>
-              <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{successes} tokens</span>
+              <span style={{ color: 'var(--color-success)', fontWeight: 600 }}>{successCount} token{successCount !== 1 ? 's' : ''}</span>
             </div>
-            {fails > 0 && (
+            {failCount > 0 && (
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span>Failed/Skipped:</span>
-                <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{fails} tokens</span>
+                <span>Failed / No route:</span>
+                <span style={{ color: 'var(--color-danger)', fontWeight: 600 }}>{failCount} token{failCount !== 1 ? 's' : ''}</span>
+              </div>
+            )}
+            {batchCount > 1 && (
+              <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
+                Sent in {batchCount} batches (wallet limit: {BATCH_SIZE} tokens per transaction)
               </div>
             )}
           </div>
         </div>
-      )
+      ),
     });
   };
 
+  // ─── Layout guards ────────────────────────────────────────────────────────
   if (!address) {
     return (
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <GlassCard>
           <div style={{ textAlign: 'center', padding: 'var(--space-12) 0' }}>
             <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>🧹</div>
-            <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
-              StonSweep
-            </h2>
+            <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, marginBottom: 'var(--space-3)' }}>StonSweep</h2>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>
               Connect your wallet to scan for dust tokens and sweep them into TON.
             </p>
@@ -217,9 +343,11 @@ export const SweepPage: React.FC = () => {
     );
   }
 
+  const isBusy = sweepStatus === 'quoting' || sweepStatus === 'sending' || sweepStatus === 'confirming';
+
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }}>
-      {/* Header Stats */}
+      {/* Header */}
       <motion.div variants={itemVariants} initial="hidden" animate="visible" style={{ marginBottom: 'var(--space-6)' }}>
         <GlassCard>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
@@ -232,19 +360,13 @@ export const SweepPage: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; refresh(); }} disabled={loading}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; refresh(); }} disabled={loading || isBusy}>
                 {loading ? '⏳' : '🔄'} Refresh
               </button>
-              <button className="btn btn-ghost btn-sm" onClick={selectAllDust}>
-                Select Dust
-              </button>
-              <button className="btn btn-ghost btn-sm" onClick={selectAll}>
-                Select All
-              </button>
+              <button className="btn btn-ghost btn-sm" onClick={selectAllDust} disabled={isBusy}>Select Dust</button>
+              <button className="btn btn-ghost btn-sm" onClick={selectAll} disabled={isBusy}>Select All</button>
               {selected.size > 0 && (
-                <button className="btn btn-ghost btn-sm" onClick={clearSelection}>
-                  Clear
-                </button>
+                <button className="btn btn-ghost btn-sm" onClick={clearSelection} disabled={isBusy}>Clear</button>
               )}
             </div>
           </div>
@@ -252,14 +374,12 @@ export const SweepPage: React.FC = () => {
       </motion.div>
 
       <div className="page-two-col page-two-col--narrow">
-        {/* Jetton List */}
+        {/* Token list */}
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <GlassCard style={{ padding: 'var(--space-4)' }}>
             {loading ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', padding: 'var(--space-4)' }}>
-                {Array.from({ length: 5 }).map((_, i) => (
-                  <LoadingSkeleton key={i} height="60px" />
-                ))}
+                {Array.from({ length: 5 }).map((_, i) => <LoadingSkeleton key={i} height="60px" />)}
               </div>
             ) : (
               <div className="jetton-list">
@@ -271,28 +391,20 @@ export const SweepPage: React.FC = () => {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.05, duration: 0.3 }}
                       className={`jetton-item ${selected.has(jetton.jetton.address) ? 'selected' : ''}`}
-                      onClick={() => sweepStatus === 'idle' || sweepStatus === 'ready' ? toggleSelect(jetton.jetton.address) : null}
-                      style={{ cursor: sweepStatus === 'sweeping' ? 'default' : 'pointer' }}
+                      onClick={() => !isBusy && toggleSelect(jetton.jetton.address)}
+                      style={{ cursor: isBusy ? 'default' : 'pointer' }}
                     >
-                      <div
-                        className={`jetton-checkbox ${selected.has(jetton.jetton.address) ? 'checked' : ''}`}
-                      >
+                      <div className={`jetton-checkbox ${selected.has(jetton.jetton.address) ? 'checked' : ''}`}>
                         {selected.has(jetton.jetton.address) && '✓'}
                       </div>
-                      <div className="jetton-icon">
-                        {jetton.jetton.symbol?.slice(0, 2) || '??'}
-                      </div>
+                      <div className="jetton-icon">{jetton.jetton.symbol?.slice(0, 2) || '??'}</div>
                       <div className="jetton-info">
                         <div className="jetton-name">{jetton.jetton.name}</div>
                         <div className="jetton-symbol">{jetton.jetton.symbol}</div>
                       </div>
-                      {jetton.isDust && (
-                        <span className="jetton-dust-badge">DUST</span>
-                      )}
+                      {jetton.isDust && <span className="jetton-dust-badge">DUST</span>}
                       <div className="jetton-balance">
-                        <div className="jetton-amount">
-                          {formatJettonAmount(jetton.balance, jetton.jetton.decimals)}
-                        </div>
+                        <div className="jetton-amount">{formatJettonAmount(jetton.balance, jetton.jetton.decimals)}</div>
                         <div className="jetton-usd">{formatUSD(jetton.usdValue)}</div>
                       </div>
                     </motion.div>
@@ -310,28 +422,27 @@ export const SweepPage: React.FC = () => {
               Sweep Summary
             </h3>
 
+            {/* Stats */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', marginBottom: 'var(--space-6)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Selected tokens</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>{selected.size}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Estimated value</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-accent)' }}>
-                  {formatUSD(selectedTotalValue)}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Slippage tolerance</span>
-                <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>3%</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
-                <span style={{ color: 'var(--color-text-secondary)' }}>Route optimizer</span>
-                <span className="badge badge--accent" style={{ fontSize: '10px' }}>Omniston</span>
-              </div>
+              {[
+                { label: 'Selected tokens', value: selected.size.toString() },
+                { label: 'Estimated value', value: formatUSD(selectedTotalValue), accent: true },
+                { label: 'Slippage tolerance', value: '3%' },
+                { label: 'Route optimizer', badge: 'Omniston' },
+                { label: 'Confirmations', value: `${Math.ceil(selectedJettons.length / BATCH_SIZE)} wallet signature${Math.ceil(selectedJettons.length / BATCH_SIZE) !== 1 ? 's' : ''}` },
+              ].map(({ label, value, badge, accent }) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', alignItems: 'center' }}>
+                  <span style={{ color: 'var(--color-text-secondary)' }}>{label}</span>
+                  {badge
+                    ? <span className="badge badge--accent" style={{ fontSize: '10px' }}>{badge}</span>
+                    : <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: accent ? 'var(--color-accent)' : undefined }}>{value}</span>
+                  }
+                </div>
+              ))}
             </div>
 
-            {sweepStatus !== 'sweeping' && sweepStatus !== 'done' && (
+            {/* Idle → show Sweep button */}
+            {sweepStatus === 'idle' && (
               <button
                 className="btn btn-primary btn-lg btn-full"
                 onClick={startSweep}
@@ -341,42 +452,57 @@ export const SweepPage: React.FC = () => {
               </button>
             )}
 
-            {/* Sweep Progress */}
-            {(sweepStatus === 'sweeping' || sweepStatus === 'done') && (
+            {/* Active sweep → show progress */}
+            {(isBusy || sweepStatus === 'done') && (
               <div className="sweep-progress">
+                {/* Phase banner */}
+                {statusMessage && (
+                  <div style={{
+                    marginBottom: 'var(--space-3)',
+                    padding: 'var(--space-2) var(--space-3)',
+                    background: 'var(--color-primary-soft)',
+                    borderRadius: 'var(--radius-sm)',
+                    fontSize: 'var(--text-xs)',
+                    color: 'var(--color-primary)',
+                    textAlign: 'center',
+                    fontWeight: 500,
+                  }}>
+                    {sweepStatus === 'confirming' && <span className="animate-spin" style={{ marginRight: 4 }}>🔄</span>}
+                    {statusMessage}
+                  </div>
+                )}
+
+                {/* Progress bar */}
                 <div style={{ marginBottom: 'var(--space-3)' }}>
                   <div className="progress-bar">
                     <div
                       className="progress-fill"
                       style={{
-                        width: `${((sweepSteps.filter(s => s.status === 'done' || s.status === 'error').length) / sweepSteps.length) * 100}%`,
+                        width: `${(sweepSteps.filter(s => s.status === 'done' || s.status === 'error').length / Math.max(sweepSteps.length, 1)) * 100}%`,
+                        transition: 'width 0.4s ease',
                       }}
                     />
                   </div>
-                  <div style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-text-tertiary)',
-                    marginTop: 'var(--space-2)',
-                    textAlign: 'center',
-                  }}>
+                  <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', textAlign: 'center' }}>
                     {sweepStatus === 'done'
-                      ? '✅ Sweep complete!'
-                      : `Processing ${currentStep + 1} of ${sweepSteps.length}...`}
+                      ? `✅ ${sweepSteps.filter(s => s.status === 'done').length} of ${sweepSteps.length} swept`
+                      : `${sweepSteps.filter(s => s.status === 'done' || s.status === 'error').length} / ${sweepSteps.length} processed`
+                    }
                   </div>
                 </div>
 
-                {sweepSteps.map((step) => (
+                {/* Per-token step list */}
+                {sweepSteps.map(step => (
                   <div key={step.jetton.jetton.address} className={`sweep-step sweep-step--${step.status}`}>
                     <div className="sweep-step-icon">
-                      {step.status === 'pending' && '⏳'}
-                      {step.status === 'processing' && <span className="animate-spin">⚡</span>}
-                      {step.status === 'done' && '✅'}
-                      {step.status === 'error' && '❌'}
+                      <StepIcon status={step.status} />
                     </div>
                     <div style={{ flex: 1 }}>
                       <div style={{ fontWeight: 500 }}>{step.jetton.jetton.symbol}</div>
                       {step.error && (
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-danger)' }}>{step.error}</div>
+                        <div style={{ fontSize: 'var(--text-xs)', color: step.status === 'done' ? 'var(--color-text-tertiary)' : 'var(--color-danger)' }}>
+                          {step.error}
+                        </div>
                       )}
                     </div>
                     <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
@@ -385,6 +511,7 @@ export const SweepPage: React.FC = () => {
                   </div>
                 ))}
 
+                {/* Done → Scan Again */}
                 {sweepStatus === 'done' && (
                   <button
                     className="btn btn-accent btn-full"
@@ -392,7 +519,7 @@ export const SweepPage: React.FC = () => {
                       setSweepStatus('idle');
                       setSweepSteps([]);
                       setSelected(new Set());
-                      hasAutoSelected.current = false; // allow re-auto-select after rescan
+                      hasAutoSelected.current = false;
                       refresh();
                     }}
                     style={{ marginTop: 'var(--space-4)' }}
@@ -403,6 +530,7 @@ export const SweepPage: React.FC = () => {
               </div>
             )}
 
+            {/* Info footer */}
             <div style={{
               marginTop: 'var(--space-4)',
               padding: 'var(--space-3)',
@@ -412,7 +540,8 @@ export const SweepPage: React.FC = () => {
               color: 'var(--color-text-tertiary)',
               lineHeight: 1.6,
             }}>
-              💡 StonSweep uses Omniston to find the best swap routes across all TON DEXs, minimizing slippage on small token balances.
+              💡 StonSweep uses Omniston to find the best swap routes across all TON DEXs,
+              minimizing slippage on small token balances.
             </div>
           </GlassCard>
         </motion.div>
