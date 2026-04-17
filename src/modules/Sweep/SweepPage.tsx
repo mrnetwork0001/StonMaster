@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../../components/common/GlassCard';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
@@ -32,6 +32,8 @@ export const SweepPage: React.FC = () => {
   const [sweepStatus, setSweepStatus] = useState<SweepStatus>('idle');
   const [sweepSteps, setSweepSteps] = useState<SweepStep[]>([]);
   const [currentStep, setCurrentStep] = useState(0);
+  // Guard so auto-select dust runs exactly once after first load, never after user changes
+  const hasAutoSelected = useRef(false);
 
   const [modal, setModal] = useState<{
     isOpen: boolean;
@@ -45,12 +47,15 @@ export const SweepPage: React.FC = () => {
     type: 'info'
   });
 
-  // Auto-select dust on load
+  // Auto-select dust tokens exactly ONCE when they first load.
+  // We deliberately do NOT watch selected.size — watching it caused Clear and
+  // manual deselection to immediately re-trigger this effect and re-select dust.
   React.useEffect(() => {
-    if (dustJettons.length > 0 && selected.size === 0) {
+    if (dustJettons.length > 0 && !hasAutoSelected.current) {
+      hasAutoSelected.current = true;
       setSelected(new Set(dustJettons.map(j => j.jetton.address)));
     }
-  }, [dustJettons, selected.size]);
+  }, [dustJettons]);
 
   const selectedJettons = useMemo(
     () => jettons.filter(j => selected.has(j.jetton.address)),
@@ -227,7 +232,7 @@ export const SweepPage: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-              <button className="btn btn-ghost btn-sm" onClick={refresh} disabled={loading}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; refresh(); }} disabled={loading}>
                 {loading ? '⏳' : '🔄'} Refresh
               </button>
               <button className="btn btn-ghost btn-sm" onClick={selectAllDust}>
@@ -387,6 +392,7 @@ export const SweepPage: React.FC = () => {
                       setSweepStatus('idle');
                       setSweepSteps([]);
                       setSelected(new Set());
+                      hasAutoSelected.current = false; // allow re-auto-select after rescan
                       refresh();
                     }}
                     style={{ marginTop: 'var(--space-4)' }}
