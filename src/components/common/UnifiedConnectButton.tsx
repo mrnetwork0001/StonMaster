@@ -21,9 +21,15 @@ export const UnifiedConnectButton: React.FC = () => {
 
   // When connected — show dropdown with copy + disconnect
   if (isConnected && address) {
-    const shortAddress = address.includes('@')
-      ? address  // email display
-      : `${address.slice(0, 6)}...${address.slice(-4)}`;
+    const shortAddress = (() => {
+      if (address.includes('@')) {
+        // Email: mrnetwork0001@gmail.com → mr...com
+        const tld = address.split('.').pop() || '';
+        return `${address.slice(0, 2)}...${tld}`;
+      }
+      // TON/EVM address
+      return `${address.slice(0, 6)}...${address.slice(-4)}`;
+    })();
     const typeLabel = walletType === 'tonconnect' ? 'Wallet' : 'Social';
 
     return (
