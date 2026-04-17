@@ -34,7 +34,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
   return createPortal(
     <AnimatePresence>
       {isOpen && (
-        <>
+        <div key="glass-modal-portal">
           {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
@@ -89,7 +89,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
               )}
             </motion.div>
           </div>
-        </>
+        </div>
       )}
 
       <style>{`
