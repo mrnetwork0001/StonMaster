@@ -1,22 +1,32 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Tonstakers } from 'tonstakers-sdk';
 import { useTonConnectUI } from '@tonconnect/ui-react';
+import { Address } from '@ton/core';
 import { useWallet } from './useWallet';
-import { TONAPI_KEY, TONSTAKERS_PARTNER_CODE } from '../utils/constants';
+import { useTonBalance } from './useTonBalance';
+import { fetchJettonBalances } from '../services/tonapi';
+import { TONAPI_KEY, TONSTAKERS_PARTNER_CODE, TSTON_ADDRESS } from '../utils/constants';
+
+// ─── Fallback values ────────────────────────────────────────────────────────
+// getTvl() and getInstantLiquidity() return nanoTON already — store as-is.
+const FALLBACK_APY      = 4.25;
+const FALLBACK_TVL_NANO = 128_000_000 * 1e9;   // 128M TON expressed in nanoTON
+const FALLBACK_STAKERS  = 45_000;
+const FALLBACK_RATES    = { TONUSD: 0, tsTONTON: 1.067, tsTONTONProjected: 1.08 };
+const FALLBACK_LIQ_NANO = 6_000 * 1e9;          // 6K TON expressed in nanoTON
 
 interface TonstakersState {
-  ready: boolean;
+  sdkReady: boolean;
   apy: number;
-  tvl: string;
+  tvl: string;             // nanoTON string — consumed by nanoToTon() in EarnPage
   stakersCount: number;
-  stakedBalance: string;
-  availableBalance: string;
+  stakedBalance: string;   // tsTON jetton balance in nanoTON (from TonAPI, not SDK)
   rates: {
     TONUSD: number;
     tsTONTON: number;
     tsTONTONProjected: number;
   };
-  instantLiquidity: string;
+  instantLiquidity: string; // nanoTON string
   loading: boolean;
   error: string | null;
 }
@@ -24,125 +34,207 @@ interface TonstakersState {
 export function useTonstakers() {
   const [tonConnectUI] = useTonConnectUI();
   const { address } = useWallet();
-  
+
+  // Real wallet TON balance from TonAPI — displayed as "Available" on the stake page
+  const { balance: walletBalanceNano, refresh: refreshBalance } = useTonBalance();
+
+  const sdkRef        = useRef<Tonstakers | null>(null);
+  const sdkReadyRef   = useRef<boolean>(false);
+  const refreshingRef = useRef<boolean>(false); // deduplicate concurrent refresh() calls
+
   const [state, setState] = useState<TonstakersState>({
-    ready: false,
+    sdkReady: false,
     apy: 0,
     tvl: '0',
     stakersCount: 0,
     stakedBalance: '0',
-    availableBalance: '0',
     rates: { TONUSD: 0, tsTONTON: 0, tsTONTONProjected: 0 },
     instantLiquidity: '0',
     loading: true,
     error: null,
   });
 
-  const tonstakers = useMemo(() => {
-    if (!tonConnectUI) return null;
-    return new Tonstakers({
-      connector: tonConnectUI,
-      tonApiKey: TONAPI_KEY,
-      partnerCode: TONSTAKERS_PARTNER_CODE,
-    });
-  }, [tonConnectUI]);
+  // ─── Fetch real tsTON jetton balance directly from TonAPI ─────────────────
+  // More reliable than SDK.getStakedBalance() which requires internal SDK setup.
+  // TonAPI returns jetton.address in raw hex form (0:xxx...) while TSTON_ADDRESS
+  // is stored in user-friendly EQ form — normalize both with @ton/core before comparing.
+  const fetchTstonBalance = useCallback(async (): Promise<string> => {
+    if (!address) return '0';
+    try {
+      const normalize = (addr: string) => {
+        try { return Address.parse(addr).toRawString().toLowerCase(); }
+        catch { return addr.toLowerCase(); }
+      };
+      const tstonRaw = normalize(TSTON_ADDRESS);
+      const jettons = await fetchJettonBalances(address);
+      const tston = jettons.find(j =>
+        normalize(j.jetton.address) === tstonRaw ||
+        j.jetton.symbol?.toLowerCase() === 'tston'  // fallback: match by symbol
+      );
+      console.log('[tsTON] Found:', tston?.balance, 'from', jettons.length, 'jettons');
+      return tston?.balance ?? '0';
+    } catch (e) {
+      console.warn('[tsTON] fetchTstonBalance failed:', e);
+      return '0';
+    }
+  }, [address]);
 
-  const refresh = async () => {
-    if (!tonstakers) {
-      console.log('[Tonstakers] SDK not initialized yet');
+  // ─── Refresh global staking stats + personal tsTON balance ──────────────────
+  const refresh = useCallback(async () => {
+    const sdk = sdkRef.current;
+    if (!sdk) {
+      console.log('[Tonstakers] SDK ref not set yet');
       return;
     }
-    
+    // Prevent concurrent fetches from stacking (e.g. multiple effects firing together)
+    if (refreshingRef.current) {
+      console.log('[Tonstakers] refresh already in flight, skipping');
+      return;
+    }
+    refreshingRef.current = true;
     setState(prev => ({ ...prev, loading: true, error: null }));
-    console.log('[Tonstakers] Fetching data...');
-    
-    try {
-      // Helper to fetch data with a fallback
-      const safeFetch = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
-        try {
-          return await promise;
-        } catch (e) {
-          console.warn('[Tonstakers] Partial fetch failure:', e);
-          return fallback;
-        }
-      };
 
-      // Fetch global data individually to prevent one failure from blocking others
-      const apy = await safeFetch(tonstakers.getCurrentApy(), state.apy || 4.25);
-      const tvl = await safeFetch(tonstakers.getTvl(), Number(state.tvl) / 1e9 || 128000000);
-      const stakersCount = await safeFetch(tonstakers.getStakersCount(), state.stakersCount || 45000);
-      const rates = await safeFetch(tonstakers.getRates(), state.rates || { TONUSD: 0, tsTONTON: 1.06, tsTONTONProjected: 1.07 });
-      const instantLiquidity = await safeFetch(tonstakers.getInstantLiquidity(), Number(state.instantLiquidity) / 1e9 || 0);
-
-      let stakerData = { balance: state.stakedBalance, available: state.availableBalance };
-      
-      if (address) {
-        try {
-          const staked = await tonstakers.getStakedBalance();
-          const available = await tonstakers.getAvailableBalance();
-          stakerData = {
-            balance: (staked * 1e9).toString(),
-            available: (available * 1e9).toString(),
-          };
-        } catch (e) {
-          console.warn('[Tonstakers] Failed to fetch personal balances:', e);
-        }
+    const safeFetch = async <T>(promise: Promise<T>, fallback: T): Promise<T> => {
+      try {
+        return await promise;
+      } catch (e) {
+        console.warn('[Tonstakers] Partial fetch failure:', e);
+        return fallback;
       }
+    };
+
+    try {
+      // Run global stats + tsTON jetton balance in parallel
+      const [apy, tvlNano, stakersCount, rates, liquidityNano, tstonBalanceNano] =
+        await Promise.all([
+          safeFetch(sdk.getCurrentApy(),       FALLBACK_APY),
+          safeFetch(sdk.getTvl(),              FALLBACK_TVL_NANO),
+          safeFetch(sdk.getStakersCount(),     FALLBACK_STAKERS),
+          safeFetch(sdk.getRates(),            FALLBACK_RATES),
+          safeFetch(sdk.getInstantLiquidity(), FALLBACK_LIQ_NANO),
+          fetchTstonBalance(), // direct TonAPI jetton endpoint — always accurate
+        ]);
 
       setState({
-        ready: true,
-        apy: apy,
-        tvl: (tvl * 1e9).toString(),
-        stakersCount: stakersCount,
-        stakedBalance: stakerData.balance,
-        availableBalance: stakerData.available,
+        sdkReady: sdkReadyRef.current,
+        apy,
+        tvl:             String(tvlNano),       // nanoTON
+        stakersCount,
+        stakedBalance:   tstonBalanceNano,       // nanoTON from TonAPI
         rates: {
-          TONUSD: rates.TONUSD || state.rates.TONUSD,
-          tsTONTON: rates.tsTONTON || state.rates.tsTONTON,
-          tsTONTONProjected: rates.tsTONTONProjected || state.rates.tsTONTONProjected,
+          TONUSD:             rates.TONUSD,
+          tsTONTON:           rates.tsTONTON,
+          tsTONTONProjected:  rates.tsTONTONProjected,
         },
-        instantLiquidity: (instantLiquidity * 1e9).toString(),
-        loading: false,
-        error: null,
+        instantLiquidity: String(liquidityNano), // nanoTON
+        loading:  false,
+        error:    null,
       });
     } catch (err) {
       console.error('[Tonstakers] General Refresh Error:', err);
-      setState(prev => ({ 
-        ...prev, 
-        loading: false, 
-        error: err instanceof Error ? err.message : 'Failed to fetch staking data' 
+      setState(prev => ({
+        ...prev,
+        loading: false,
+        error: err instanceof Error ? err.message : 'Failed to fetch staking data',
       }));
+    } finally {
+      refreshingRef.current = false;
     }
-  };
+  }, [address, fetchTstonBalance]);
 
+  // ─── SDK lifecycle ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (tonstakers) {
-      refresh();
-      const interval = setInterval(refresh, 60000); 
-      return () => clearInterval(interval);
-    }
-  }, [tonstakers, address]); // Re-run when wallet connects but load global stats even if it doesn't
+    if (!tonConnectUI) return;
 
+    console.log('[Tonstakers] Creating SDK instance…');
+    const isMockKey = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
+    const sdk = new Tonstakers({
+      connector: tonConnectUI,
+      ...(isMockKey ? {} : { tonApiKey: TONAPI_KEY }),
+      partnerCode: TONSTAKERS_PARTNER_CODE,
+    });
+
+    sdkRef.current = sdk;
+
+    const onInit = () => {
+      console.log('[Tonstakers] initialized ✅');
+      sdkReadyRef.current = true;
+      setState(prev => ({ ...prev, sdkReady: true }));
+      refresh();
+    };
+
+    const onDeinit = () => {
+      console.log('[Tonstakers] deinitialized');
+      sdkReadyRef.current = false;
+      setState(prev => ({ ...prev, sdkReady: false }));
+    };
+
+    sdk.addEventListener('initialized', onInit);
+    sdk.addEventListener('deinitialized', onDeinit);
+
+    // TonConnect's onStatusChange only fires on CHANGES.
+    // If the wallet was already connected when the SDK was created, 'initialized'
+    // will never fire — detect and handle this immediately.
+    const existingWallet = (tonConnectUI as unknown as { wallet: unknown }).wallet;
+    if (existingWallet) {
+      console.log('[Tonstakers] Wallet already connected — marking ready immediately');
+      sdkReadyRef.current = true;
+      setState(prev => ({ ...prev, sdkReady: true }));
+    }
+
+    refresh();
+    const interval = setInterval(refresh, 90_000); // 90s — avoid API rate limits
+
+    return () => {
+      clearInterval(interval);
+      sdk.removeEventListener('initialized', onInit);
+      sdk.removeEventListener('deinitialized', onDeinit);
+      sdkReadyRef.current = false;
+      sdkRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tonConnectUI]);
+
+  // Re-fetch personal balance when wallet connects / disconnects.
+  // Only calls refreshBalance() here; refresh() was already called by the SDK lifecycle effect.
+  useEffect(() => {
+    if (tonConnectUI) {
+      const existingWallet = (tonConnectUI as unknown as { wallet: unknown }).wallet;
+      if (existingWallet && !sdkReadyRef.current) {
+        sdkReadyRef.current = true;
+        setState(prev => ({ ...prev, sdkReady: true }));
+      }
+    }
+    refreshBalance();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [address]);
+
+  // ─── Transaction helpers ────────────────────────────────────────────────────
   const stake = async (amountNano: string) => {
-    if (!tonstakers) throw new Error('SDK not initialized');
-    await tonstakers.stake(BigInt(amountNano));
-    await refresh();
+    const sdk = sdkRef.current;
+    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
+    await sdk.stake(BigInt(amountNano));
+    await Promise.all([refresh(), refreshBalance()]);
   };
 
   const unstake = async (amountNano: string) => {
-    if (!tonstakers) throw new Error('SDK not initialized');
-    await tonstakers.unstake(BigInt(amountNano));
-    await refresh();
+    const sdk = sdkRef.current;
+    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
+    await sdk.unstake(BigInt(amountNano));
+    await Promise.all([refresh(), refreshBalance()]);
   };
 
   const unstakeInstant = async (amountNano: string) => {
-    if (!tonstakers) throw new Error('SDK not initialized');
-    await tonstakers.unstakeInstant(BigInt(amountNano));
-    await refresh();
+    const sdk = sdkRef.current;
+    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
+    await sdk.unstakeInstant(BigInt(amountNano));
+    await Promise.all([refresh(), refreshBalance()]);
   };
 
   return {
     ...state,
+    // Expose real wallet TON nano balance as "Available" for the stake input
+    availableBalance: walletBalanceNano,
     stake,
     unstake,
     unstakeInstant,

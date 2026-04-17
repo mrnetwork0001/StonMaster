@@ -55,9 +55,16 @@ export interface AccountInfo {
 
 
 
-const headers: Record<string, string> = {};
-if (TONAPI_KEY && TONAPI_KEY !== 'mock_tonapi_key_replace_me') {
-  headers['Authorization'] = `Bearer ${TONAPI_KEY}`;
+/**
+ * Build request headers, picking up the current TONAPI_KEY each call.
+ * (A static const initialised at module-load time would miss late env changes.)
+ */
+function getHeaders(): Record<string, string> {
+  const key = TONAPI_KEY;
+  if (key && key !== 'mock_tonapi_key_replace_me') {
+    return { Authorization: `Bearer ${key}` };
+  }
+  return {};
 }
 
 /**
@@ -68,7 +75,7 @@ export async function fetchJettonBalances(address: string): Promise<JettonBalanc
   try {
     const response = await fetchWithRetry(
       `${TONAPI_BASE_URL}/accounts/${address}/jettons?currencies=usd`,
-      { headers }
+      { headers: getHeaders() }
     );
     if (!response.ok) throw new Error(`TonAPI error: ${response.status}`);
     const data: JettonBalancesResponse = await response.json();
@@ -88,7 +95,7 @@ export async function fetchTonBalance(address: string): Promise<string> {
   try {
     const response = await fetchWithRetry(
       `${TONAPI_BASE_URL}/accounts/${address}`,
-      { headers }
+      { headers: getHeaders() }
     );
     if (response.ok) {
       const data: AccountInfo = await response.json();
@@ -134,7 +141,7 @@ export async function fetchJettonMetadata(jettonAddress: string): Promise<Jetton
   try {
     const response = await fetch(
       `${TONAPI_BASE_URL}/jettons/${jettonAddress}`,
-      { headers }
+      { headers: getHeaders() }
     );
     if (!response.ok) return null;
     const data = await response.json();

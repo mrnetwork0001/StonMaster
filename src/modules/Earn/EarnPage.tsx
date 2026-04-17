@@ -37,7 +37,7 @@ export const EarnPage: React.FC = () => {
   });
 
   // Extremely defensive calculations
-  const safeNum = (val: any) => {
+  const safeNum = (val: unknown) => {
     const n = Number(val);
     return isNaN(n) ? 0 : n;
   };
@@ -63,13 +63,13 @@ export const EarnPage: React.FC = () => {
         type: 'success',
         content: `You have successfully staked ${amountNum} TON. Your tsTON balance will update shortly.`,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Stake error:', err);
       setModal({
         isOpen: true,
         title: 'Stake Failed',
         type: 'error',
-        content: err.message || 'The staking transaction was cancelled or failed.',
+        content: err instanceof Error ? err.message : 'The staking transaction was cancelled or failed.',
       });
     } finally {
       setProcessing(false);
@@ -92,13 +92,13 @@ export const EarnPage: React.FC = () => {
         type: 'success',
         content: `Your unstaking request for ${amountNum} tsTON has been sent. ${unstakeMode === 'standard' ? 'Funds will be available after the round ends.' : 'TON will arrive in your wallet shortly.'}`,
       });
-    } catch (err: any) {
+    } catch (err) {
       console.error('Unstake error:', err);
       setModal({
         isOpen: true,
         title: 'Unstake Failed',
         type: 'error',
-        content: err.message || 'The unstaking transaction was cancelled or failed.',
+        content: err instanceof Error ? err.message : 'The unstaking transaction was cancelled or failed.',
       });
     } finally {
       setProcessing(false);
