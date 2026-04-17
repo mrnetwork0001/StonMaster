@@ -7,6 +7,7 @@ import { useJettonBalances } from '../../hooks/useJettonBalances';
 import type { JettonWithValue } from '../../hooks/useJettonBalances';
 import { formatJettonAmount, formatUSD } from '../../utils/formatters';
 import { useOmniston } from '@ston-fi/omniston-sdk-react';
+import { Blockchain, SettlementMethod } from '@ston-fi/omniston-sdk';
 import { useWallet } from '../../hooks/useWallet';
 import { GlassModal } from '../../components/common/GlassModal';
 import { TON_NATIVE_ADDRESS, TONAPI_BASE_URL, TONAPI_KEY, DEFAULT_SLIPPAGE_BPS } from '../../utils/constants';
@@ -134,16 +135,24 @@ export const SweepPage: React.FC = () => {
   }, [getLatestTxLt]);
 
   // ─── Omniston helpers ─────────────────────────────────────────────────────
-  /** Fetch a swap quote from Omniston with the correct v2 API parameters. */
+  /** Fetch a swap quote from Omniston using the correct SDK field names.
+   *
+   * Verified against actual SDK source:
+   *   - bidAssetAddress = token being sold   (NOT offerAssetAddress)
+   *   - askAssetAddress = token being bought
+   *   - blockchain: Blockchain.TON = 607    (NOT the string 'TON')
+   *   - amount.bidUnits                     (NOT offerUnits)
+   *   - settlementMethods: [SettlementMethod.SETTLEMENT_METHOD_SWAP]
+   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const getQuote = useCallback((jetton: JettonWithValue): Promise<any> =>
     new Promise((resolve, reject) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sub = (omniston as any).requestForQuote({
-        settlementMethods: ['SWAP'],
-        offerAssetAddress: { blockchain: 'TON', address: jetton.jetton.address },
-        askAssetAddress:   { blockchain: 'TON', address: TON_NATIVE_ADDRESS },
-        amount: { offerUnits: jetton.balance }, // already in smallest unit from TonAPI
+        settlementMethods: [SettlementMethod.SETTLEMENT_METHOD_SWAP],
+        bidAssetAddress: { blockchain: Blockchain.TON, address: jetton.jetton.address },
+        askAssetAddress: { blockchain: Blockchain.TON, address: TON_NATIVE_ADDRESS },
+        amount: { bidUnits: jetton.balance }, // bidUnits = amount of token being sold
         settlementParams: { maxPriceSlippageBps: DEFAULT_SLIPPAGE_BPS },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       }).subscribe({
@@ -151,7 +160,7 @@ export const SweepPage: React.FC = () => {
         next: (event: any) => {
           if (event.type === 'quoteUpdated') {
             sub.unsubscribe();
-            resolve(event.quote); // resolve with the quote object, not the wrapper event
+            resolve(event.quote); // event = { type, quote } — pass the quote object directly
           }
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -169,10 +178,10 @@ export const SweepPage: React.FC = () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const tx = await (omniston as any).buildTransfer({
       quote,
-      sourceAddress:      { blockchain: 'TON', address: addr },
-      destinationAddress: { blockchain: 'TON', address: addr },
-      refundAddress:      { blockchain: 'TON', address: addr },
-      excessAddress:      { blockchain: 'TON', address: addr },
+      sourceAddress:      { blockchain: Blockchain.TON, address: addr },
+      destinationAddress: { blockchain: Blockchain.TON, address: addr },
+      refundAddress:      { blockchain: Blockchain.TON, address: addr },
+      excessAddress:      { blockchain: Blockchain.TON, address: addr },
     });
     if (!tx?.ton?.messages?.length) throw new Error('No messages returned — token may not be swappable');
     const msg = tx.ton.messages[0];
