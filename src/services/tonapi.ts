@@ -53,105 +53,10 @@ export interface AccountInfo {
   };
 }
 
-// Mock data for development (when no API key)
-const MOCK_JETTONS: JettonBalance[] = [
-  {
-    balance: '15000000',
-    wallet_address: { address: 'EQMock1...', is_scam: false },
-    jetton: {
-      address: 'EQBynBO23ywHy_CgarY9NK9FTz0yDRg0KLF0Qf',
-      name: 'Notcoin',
-      symbol: 'NOT',
-      decimals: 9,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 0.0045 } },
-  },
-  {
-    balance: '250000000',
-    wallet_address: { address: 'EQMock2...', is_scam: false },
-    jetton: {
-      address: 'EQAvlWFDxGF2lXm67y4yzC17wYKD9A0guwPkMs',
-      name: 'Toncoin Wrapped',
-      symbol: 'jTON',
-      decimals: 9,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 3.45 } },
-  },
-  {
-    balance: '8900000000',
-    wallet_address: { address: 'EQMock3...', is_scam: false },
-    jetton: {
-      address: 'EQCM3B12QK1e4yZSf8GtBRT0aLMNyEsBc_DhVf',
-      name: 'STON.fi Token',
-      symbol: 'STON',
-      decimals: 9,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 0.00012 } },
-  },
-  {
-    balance: '45000000000',
-    wallet_address: { address: 'EQMock4...', is_scam: false },
-    jetton: {
-      address: 'EQBlqsm144Dq6SjbPI4jjZvA1hqTIP3CvHovbI',
-      name: 'DeDust Token',
-      symbol: 'DUST',
-      decimals: 9,
-      image: '',
-      verification: 'none',
-    },
-    price: { prices: { USD: 0.000008 } },
-  },
-  {
-    balance: '100000',
-    wallet_address: { address: 'EQMock5...', is_scam: false },
-    jetton: {
-      address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv',
-      name: 'USD₮',
-      symbol: 'USDT',
-      decimals: 6,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 1.0 } },
-  },
-  {
-    balance: '3200000000000',
-    wallet_address: { address: 'EQMock6...', is_scam: false },
-    jetton: {
-      address: 'EQD2NmD_lH5f5u1Kj3KfGyTvhZSX3MbB-xCr',
-      name: 'Hamster Kombat',
-      symbol: 'HMSTR',
-      decimals: 9,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 0.0000001 } },
-  },
-  {
-    balance: '75000000',
-    wallet_address: { address: 'EQMock7...', is_scam: false },
-    jetton: {
-      address: 'EQBqSpvo3PP9lTx9l7F_lXMP9l7F_lXMP9l7',
-      name: 'Dogs',
-      symbol: 'DOGS',
-      decimals: 9,
-      image: '',
-      verification: 'whitelist',
-    },
-    price: { prices: { USD: 0.0003 } },
-  },
-];
 
-const isMocked = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
 
 const headers: Record<string, string> = {};
-if (!isMocked && TONAPI_KEY) {
+if (TONAPI_KEY && TONAPI_KEY !== 'mock_tonapi_key_replace_me') {
   headers['Authorization'] = `Bearer ${TONAPI_KEY}`;
 }
 
@@ -159,11 +64,6 @@ if (!isMocked && TONAPI_KEY) {
  * Fetch jetton balances for a wallet address
  */
 export async function fetchJettonBalances(address: string): Promise<JettonBalance[]> {
-  if (isMocked) {
-    // Return mock data with a small delay to simulate network
-    await new Promise(r => setTimeout(r, 800));
-    return MOCK_JETTONS;
-  }
 
   try {
     const response = await fetchWithRetry(
@@ -175,7 +75,7 @@ export async function fetchJettonBalances(address: string): Promise<JettonBalanc
     return data.balances;
   } catch (error) {
     console.error('Failed to fetch jetton balances:', error);
-    return MOCK_JETTONS; // Fallback to mock
+    return []; // Fallback to empty array
   }
 }
 
@@ -183,10 +83,6 @@ export async function fetchJettonBalances(address: string): Promise<JettonBalanc
  * Fetch TON balance for a wallet address
  */
 export async function fetchTonBalance(address: string): Promise<string> {
-  if (isMocked) {
-    await new Promise(r => setTimeout(r, 400));
-    return '5250000000'; // 5.25 TON mock
-  }
 
   // 1. Try TonAPI first
   try {
@@ -234,18 +130,6 @@ export async function fetchTonBalance(address: string): Promise<string> {
  * Fetch metadata for a specific jetton master address
  */
 export async function fetchJettonMetadata(jettonAddress: string): Promise<JettonBalance['jetton'] | null> {
-  if (isMocked) {
-    if (jettonAddress === 'custom_mock_unverified') {
-      return {
-        address: jettonAddress,
-        name: 'New Token',
-        symbol: 'NEW',
-        decimals: 9,
-        verification: 'none'
-      };
-    }
-    return null;
-  }
 
   try {
     const response = await fetch(
