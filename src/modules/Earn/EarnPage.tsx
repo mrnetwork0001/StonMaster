@@ -321,9 +321,11 @@ export const EarnPage: React.FC = () => {
             <button
               className={`btn ${activeTab === 'stake' ? 'btn-accent' : 'btn-primary'} btn-lg btn-full`}
               onClick={activeTab === 'stake' ? handleStake : handleUnstake}
-              disabled={amountNum <= 0 || processing}
+              disabled={amountNum <= 0 || processing || !tonstakers.sdkReady}
             >
-              {processing ? (
+              {!tonstakers.sdkReady ? (
+                <><span className="animate-spin">⚡</span> Connecting to Tonstakers...</>
+              ) : processing ? (
                 <><span className="animate-spin">⚡</span> Processing...</>
               ) : activeTab === 'stake' ? (
                 '💎 Stake TON → tsTON'

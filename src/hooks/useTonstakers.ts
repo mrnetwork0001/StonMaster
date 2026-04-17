@@ -172,15 +172,11 @@ export function useTonstakers() {
     sdk.addEventListener('initialized', onInit);
     sdk.addEventListener('deinitialized', onDeinit);
 
-    // TonConnect's onStatusChange only fires on CHANGES.
-    // If the wallet was already connected when the SDK was created, 'initialized'
-    // will never fire — detect and handle this immediately.
-    const existingWallet = (tonConnectUI as unknown as { wallet: unknown }).wallet;
-    if (existingWallet) {
-      console.log('[Tonstakers] Wallet already connected — marking ready immediately');
-      sdkReadyRef.current = true;
-      setState(prev => ({ ...prev, sdkReady: true }));
-    }
+    // NOTE: We intentionally do NOT eagerly mark sdkReady=true here.
+    // The Tonstakers SDK fires 'initialized' for already-connected wallets too
+    // (it checks connector.wallet on creation). Marking ready before that event
+    // causes sdk.stake() to throw "not fully initialized" since the SDK's
+    // internal state hasn't been set up yet.
 
     refresh();
     const interval = setInterval(refresh, 90_000); // 90s — avoid API rate limits
@@ -196,15 +192,7 @@ export function useTonstakers() {
   }, [tonConnectUI]);
 
   // Re-fetch personal balance when wallet connects / disconnects.
-  // Only calls refreshBalance() here; refresh() was already called by the SDK lifecycle effect.
   useEffect(() => {
-    if (tonConnectUI) {
-      const existingWallet = (tonConnectUI as unknown as { wallet: unknown }).wallet;
-      if (existingWallet && !sdkReadyRef.current) {
-        sdkReadyRef.current = true;
-        setState(prev => ({ ...prev, sdkReady: true }));
-      }
-    }
     refreshBalance();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
