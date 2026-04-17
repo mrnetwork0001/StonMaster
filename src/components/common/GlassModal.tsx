@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface GlassModalProps {
@@ -22,7 +23,15 @@ export const GlassModal: React.FC<GlassModalProps> = ({
   onConfirm,
   isLoading
 }) => {
-  return (
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  if (!mounted) return null;
+
+  return createPortal(
     <AnimatePresence>
       {isOpen && (
         <>
@@ -174,6 +183,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
           gap: var(--space-3);
         }
       `}</style>
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   );
 };
