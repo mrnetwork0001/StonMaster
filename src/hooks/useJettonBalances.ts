@@ -31,14 +31,16 @@ export function useJettonBalances(dustThreshold: number = 1.0) {
         fetchTonBalance(address),
       ]);
 
-      const enriched: JettonWithValue[] = jettonsData.map(j => {
-        const usdValue = getJettonUsdValue(j);
-        return {
-          ...j,
-          usdValue,
-          isDust: usdValue < dustThreshold && usdValue > 0,
-        };
-      });
+      const enriched: JettonWithValue[] = jettonsData
+        .filter(j => BigInt(j.balance || '0') > 0n)   // drop zero-balance jetton wallets
+        .map(j => {
+          const usdValue = getJettonUsdValue(j);
+          return {
+            ...j,
+            usdValue,
+            isDust: usdValue < dustThreshold && usdValue > 0,
+          };
+        });
 
       // Sort: dust first, then by value ascending
       enriched.sort((a, b) => {
