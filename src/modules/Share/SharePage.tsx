@@ -7,6 +7,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Address, Cell } from '@ton/core';
 import { createShortLink, getShortLink } from '../../services/supabase';
 import { useRfq, useOmniston } from '@ston-fi/omniston-sdk-react';
+import { Blockchain, SettlementMethod } from '@ston-fi/omniston-sdk';
 import { useWallet } from '../../hooks/useWallet';
 import { formatJettonAmount } from '../../utils/formatters';
 import { DEFAULT_TOKENS, TON_NATIVE_ADDRESS } from '../../utils/constants';
@@ -189,10 +190,17 @@ export const SharePage: React.FC = () => {
   // 2. Real-time Quote from Omniston
   const nanoAmount = fromToken.decimals === 9 ? tonToNano(parseFloat(amount) || 0) : (parseFloat(amount) * Math.pow(10, fromToken.decimals)).toString();
   
+  // useRfq params verified against actual SDK source (dist/index.js):
+  //   bidAssetAddress = token being sold  (requires { blockchain, address } wrapper)
+  //   askAssetAddress = token being bought
+  //   blockchain: Blockchain.TON = 607   (SLIP-044 numeric ID, NOT the string 'TON')
+  //   amount.bidUnits                    (NOT 'unit' or 'offerUnits')
   const { data: quote, isLoading: isQuoting } = useRfq({
-    bidAssetAddress: fromToken.address,
-    askAssetAddress: toToken.address,
-    amount: { unit: nanoAmount },
+    settlementMethods: [SettlementMethod.SETTLEMENT_METHOD_SWAP],
+    bidAssetAddress: { blockchain: Blockchain.TON, address: fromToken.address },
+    askAssetAddress: { blockchain: Blockchain.TON, address: toToken.address },
+    amount: { bidUnits: nanoAmount },
+    settlementParams: { maxPriceSlippageBps: 300 },
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any, {
     enabled: parseFloat(amount) > 0,
@@ -201,14 +209,13 @@ export const SharePage: React.FC = () => {
   const estimatedOutput = useMemo(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q = quote as any;
-    if (q) console.log('[SocialSwap] Raw quote:', JSON.stringify(q, null, 2));
     if (!q) return null;
-    // Handle both possible event types
+    // SDK emits { type: 'quoteUpdated', quote: { askUnits, ... } }
     if (q.type === 'quoteUpdated' || q.type === 'quote_updated') {
       const askUnits = q.quote?.askUnits || q.quote?.ask_units;
       if (askUnits) return formatJettonAmount(askUnits, toToken.decimals);
     }
-    // If the quote itself is a Quote object (no wrapping event)
+    // Quote object directly (no wrapper event)
     if (q.askUnits || q.ask_units) {
       return formatJettonAmount(q.askUnits || q.ask_units, toToken.decimals);
     }
