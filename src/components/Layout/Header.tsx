@@ -1,3 +1,5 @@
+import React from 'react';
+import { useLocation } from 'react-router-dom';
 import { UnifiedConnectButton } from '../common/UnifiedConnectButton';
 
 const pageTitles: Record<string, string> = {

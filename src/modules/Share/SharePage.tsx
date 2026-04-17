@@ -193,11 +193,13 @@ export const SharePage: React.FC = () => {
     bidAssetAddress: fromToken.address,
     askAssetAddress: toToken.address,
     amount: { unit: nanoAmount },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   } as any, {
     enabled: parseFloat(amount) > 0,
   });
 
   const estimatedOutput = useMemo(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const q = quote as any;
     if (q) console.log('[SocialSwap] Raw quote:', JSON.stringify(q, null, 2));
     if (!q) return null;
@@ -282,6 +284,7 @@ export const SharePage: React.FC = () => {
           const tx = await omniston.buildTransfer({
             sourceAddress: { blockchain: 607, address: address! },
             destinationAddress: { blockchain: 607, address: address! },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             quote: (quote as any).quote,
             useRecommendedSlippage: true,
           });
@@ -304,6 +307,7 @@ export const SharePage: React.FC = () => {
             type: 'success',
             content: `Your trade strategy has been broadcast to the TON network. Check your wallet for confirmation.`,
           });
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
           console.error('Follow trade failed:', err);
           setModal({

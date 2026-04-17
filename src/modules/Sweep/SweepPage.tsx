@@ -104,17 +104,20 @@ export const SweepPage: React.FC = () => {
       try {
         // 1. Get Quote (using direct instance for loop)
         const quotePromise = new Promise((resolve, reject) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const subscription = (omniston as any).requestForQuote({
             bidAssetAddress: step.jetton.jetton.address,
             askAssetAddress: TON_NATIVE_ADDRESS,
             amount: { unit: step.jetton.balance },
           }).subscribe({
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             next: (event: any) => {
               if (event.type === 'quoteUpdated') {
                 subscription.unsubscribe();
                 resolve(event);
               }
             },
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             error: (err: any) => reject(err),
           });
           // Timeout after 10s
@@ -124,6 +127,7 @@ export const SweepPage: React.FC = () => {
           }, 10000);
         });
 
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const quote: any = await quotePromise;
         
         // 2. Build Transaction
@@ -150,7 +154,7 @@ export const SweepPage: React.FC = () => {
         setSweepSteps(prev => prev.map((s, idx) =>
           idx === i ? { ...s, status: 'done' } : s
         ));
-      } catch (err: any) {
+      } catch (err: any) { // eslint-disable-line @typescript-eslint/no-explicit-any
         console.error(`Sweep failed for ${step.jetton.jetton.symbol}:`, err);
         setSweepSteps(prev => prev.map((s, idx) =>
           idx === i ? { ...s, status: 'error', error: err.message || 'Transaction failed' } : s

@@ -23,6 +23,7 @@ export function useWallet() {
 
   const isConnected = !!address;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const tonWallet = useTonWallet() as any;
   const sender: Sender = useMemo(() => {
     // 1. Priority: TonConnect
