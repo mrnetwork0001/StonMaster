@@ -10,20 +10,11 @@ export const UnifiedConnectButton: React.FC = () => {
   const { login, logout, authenticated } = usePrivy();
   const [tonConnectUI] = useTonConnectUI();
 
-  // Privy is still initialising
+  // Privy SDK still initialising on page load
   if (!ready) {
     return (
       <button className="btn btn-ghost" disabled style={{ padding: 'var(--space-2) var(--space-6)', opacity: 0.6 }}>
         ⚡ Loading...
-      </button>
-    );
-  }
-
-  // Authenticated via Privy but embedded wallet not yet created
-  if (authenticated && !isConnected) {
-    return (
-      <button className="btn btn-ghost" disabled style={{ padding: 'var(--space-2) var(--space-6)', opacity: 0.7 }}>
-        ⚡ Setting up wallet...
       </button>
     );
   }

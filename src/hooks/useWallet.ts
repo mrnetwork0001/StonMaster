@@ -10,30 +10,37 @@ export function useWallet() {
   const { authenticated, user, ready } = usePrivy();
   const { wallets } = useWallets();
 
-  // Determine wallet type and address
+  // Determine wallet type
   const walletType = useMemo(() => {
     if (tonAddress) return 'tonconnect' as const;
-    if (authenticated && ready) return 'privy' as const;
+    if (authenticated) return 'privy' as const;
     return 'none' as const;
-  }, [tonAddress, authenticated, ready]);
+  }, [tonAddress, authenticated]);
 
-  // For Privy: use the linked wallet address (EVM-based embedded wallet address as identifier)
-  // The user object's wallet field is the embedded wallet Privy creates
-  const privyAddress = useMemo(() => {
-    if (!authenticated || !ready) return null;
-    // Check wallets array first (most up to date)
-    const embeddedWallet = wallets.find(w => w.walletClientType === 'privy');
-    if (embeddedWallet?.address) return embeddedWallet.address;
-    // Fall back to user.wallet
-    if (user?.wallet?.address) return user.wallet.address;
-    return null;
-  }, [authenticated, ready, wallets, user]);
-
+  // Display address: use TonConnect address, or fall back to the user's identifier from Privy
   const address = useMemo(() => {
     if (tonAddress) return tonAddress;
-    if (privyAddress) return privyAddress;
+
+    if (authenticated && user) {
+      // Try all possible embedded wallet addresses first
+      if (wallets.length > 0) {
+        const embeddedWallet = wallets.find(w =>
+          w.walletClientType === 'privy' ||
+          w.connectorType === 'embedded'
+        );
+        if (embeddedWallet?.address) return embeddedWallet.address;
+        // Any wallet address from Privy
+        if (wallets[0]?.address) return wallets[0].address;
+      }
+      // Fall back to email as a display identifier (truncated)
+      if (user.email?.address) return user.email.address;
+      if (user.google?.email) return user.google.email;
+      // Last resort: use the Privy user ID
+      if (user.id) return `privy:${user.id.slice(-8)}`;
+    }
+
     return null;
-  }, [tonAddress, privyAddress]);
+  }, [tonAddress, authenticated, user, wallets]);
 
   const isConnected = !!address;
 
@@ -41,7 +48,7 @@ export function useWallet() {
   const tonWallet = useTonWallet() as any;
 
   const sender: Sender = useMemo(() => {
-    // 1. Priority: TonConnect hardware/software wallet
+    // 1. Priority: TonConnect (can actually sign TON transactions)
     if (tonWallet?.account) {
       return {
         address: Address.parse(tonWallet.account.address),
@@ -60,29 +67,26 @@ export function useWallet() {
       };
     }
 
-    // 2. Privy embedded wallet
-    if (authenticated && wallets.length > 0) {
-      const embeddedWallet = wallets.find(w => w.walletClientType === 'privy');
-      if (embeddedWallet) {
-        return {
-          address: undefined, // Privy embedded wallets are EVM-based, TON signing not yet natively supported
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          async send(_args: SenderArguments) {
-            throw new Error(
-              'Privy embedded wallets do not yet support direct TON transaction signing. Please connect a TON wallet (Tonkeeper) to sign transactions.'
-            );
-          },
-        };
-      }
+    // 2. Privy user authenticated — cannot sign TON txns natively
+    if (authenticated) {
+      return {
+        address: undefined,
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        async send(_args: SenderArguments) {
+          throw new Error(
+            'Social login does not support TON transaction signing. Please also connect a TON wallet (Tonkeeper) to execute swaps.'
+          );
+        },
+      };
     }
 
-    // 3. No wallet connected
+    // 3. No wallet
     return {
       async send() {
         throw new Error('No wallet connected. Please connect a TON wallet.');
       },
     };
-  }, [tonConnectUI, tonWallet, authenticated, wallets]);
+  }, [tonConnectUI, tonWallet, authenticated]);
 
   return {
     address,
