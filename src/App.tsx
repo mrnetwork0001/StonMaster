@@ -35,8 +35,10 @@ const App: React.FC = () => {
           accentColor: '#6C63FF',
           logo: '/logo.png',
           showWalletLoginFirst: false,
+          loginMethods: ['email', 'google', 'twitter', 'github'],
         },
         embeddedWallets: {
+          createOnLogin: 'all-users',
           showWalletUIs: true,
         },
       }}

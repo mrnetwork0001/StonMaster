@@ -6,9 +6,27 @@ import { useWallet } from '../../hooks/useWallet';
 
 export const UnifiedConnectButton: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
-  const { address, isConnected, walletType } = useWallet();
-  const { login, logout } = usePrivy();
+  const { address, isConnected, walletType, ready } = useWallet();
+  const { login, logout, authenticated } = usePrivy();
   const [tonConnectUI] = useTonConnectUI();
+
+  // Privy is still initialising
+  if (!ready) {
+    return (
+      <button className="btn btn-ghost" disabled style={{ padding: 'var(--space-2) var(--space-6)', opacity: 0.6 }}>
+        ⚡ Loading...
+      </button>
+    );
+  }
+
+  // Authenticated via Privy but embedded wallet not yet created
+  if (authenticated && !isConnected) {
+    return (
+      <button className="btn btn-ghost" disabled style={{ padding: 'var(--space-2) var(--space-6)', opacity: 0.7 }}>
+        ⚡ Setting up wallet...
+      </button>
+    );
+  }
 
   // When connected — show address + disconnect button
   if (isConnected && address) {
