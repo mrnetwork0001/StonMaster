@@ -30,7 +30,7 @@ export const Dashboard: React.FC = () => {
 
   const tonUsd = useMemo(() => {
     const balance = Number(tonBalance) || 0;
-    const rate = tonstakers?.rates?.TONUSD || 3.42;
+    const rate = tonstakers?.rates?.TONUSD || 3.2;
     return nanoToTon(balance) * rate;
   }, [tonBalance, tonstakers?.rates?.TONUSD]);
 

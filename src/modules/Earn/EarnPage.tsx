@@ -6,6 +6,7 @@ import { GlassModal } from '../../components/common/GlassModal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useTonstakers } from '../../hooks/useTonstakers';
 import { formatTON, formatPercent, formatNumber, formatUSD, nanoToTon, tonToNano } from '../../utils/formatters';
+import { tonviewerUrl } from '../../utils/tonExplorer';
 
 type Tab = 'stake' | 'unstake';
 type UnstakeMode = 'standard' | 'instant' | 'bestRate';
@@ -18,12 +19,12 @@ const itemVariants = {
 export const EarnPage: React.FC = () => {
   const { address } = useWallet();
   const tonstakers = useTonstakers();
+  const { sdkInitFailed, retryInit } = tonstakers;
   const [activeTab, setActiveTab] = useState<Tab>('stake');
   const [unstakeMode, setUnstakeMode] = useState<UnstakeMode>('standard');
   const [amount, setAmount] = useState('');
   const [processing, setProcessing] = useState(false);
-  const [showTvlInUsd, setShowTvlInUsd] = useState(false);
-  
+
   const [modal, setModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -55,13 +56,27 @@ export const EarnPage: React.FC = () => {
     if (amountNum <= 0) return;
     setProcessing(true);
     try {
-      await tonstakers.stake(tonToNano(amountNum));
+      const txHash = await tonstakers.stake(tonToNano(amountNum));
       setAmount('');
       setModal({
         isOpen: true,
         title: 'Stake Successful! 💎',
         type: 'success',
-        content: `You have successfully staked ${amountNum} TON. Your tsTON balance will update shortly.`,
+        content: (
+          <div>
+            <p>You have successfully staked <strong>{amountNum} TON</strong>. Your tsTON balance will update shortly.</p>
+            {txHash && (
+              <a
+                href={tonviewerUrl(txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-accent)', fontWeight: 600 }}
+              >
+                🔍 View in Explorer ↗
+              </a>
+            )}
+          </div>
+        ),
       });
     } catch (err) {
       console.error('Stake error:', err);
@@ -80,17 +95,32 @@ export const EarnPage: React.FC = () => {
     if (amountNum <= 0) return;
     setProcessing(true);
     try {
-      if (unstakeMode === 'instant') {
-        await tonstakers.unstakeInstant(tonToNano(amountNum));
-      } else {
-        await tonstakers.unstake(tonToNano(amountNum));
-      }
+      const txHash = unstakeMode === 'instant'
+        ? await tonstakers.unstakeInstant(tonToNano(amountNum))
+        : await tonstakers.unstake(tonToNano(amountNum));
       setAmount('');
       setModal({
         isOpen: true,
         title: 'Unstake Initiated! 🔓',
         type: 'success',
-        content: `Your unstaking request for ${amountNum} tsTON has been sent. ${unstakeMode === 'standard' ? 'Funds will be available after the round ends.' : 'TON will arrive in your wallet shortly.'}`,
+        content: (
+          <div>
+            <p>
+              Your unstaking request for <strong>{amountNum} tsTON</strong> has been sent.{' '}
+              {unstakeMode === 'standard' ? 'Funds will be available after the round ends.' : 'TON will arrive in your wallet shortly.'}
+            </p>
+            {txHash && (
+              <a
+                href={tonviewerUrl(txHash)}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', marginTop: 'var(--space-4)', fontSize: 'var(--text-sm)', color: 'var(--color-accent)', fontWeight: 600 }}
+              >
+                🔍 View in Explorer ↗
+              </a>
+            )}
+          </div>
+        ),
       });
     } catch (err) {
       console.error('Unstake error:', err);
@@ -135,15 +165,7 @@ export const EarnPage: React.FC = () => {
   const statItems = [
     { label: 'Current APY', value: formatPercent(tonstakers.apy), color: 'var(--color-success)' },
     { label: 'Your tsTON', value: `${formatTON(tonstakers.stakedBalance)} tsTON`, color: 'var(--color-accent)' },
-    { 
-      label: 'TVL', 
-      value: showTvlInUsd 
-        ? formatUSD(tvlUsd || 0) 
-        : `${formatNumber(tvlTon || 0, 1)} TON`,
-      color: 'var(--color-primary)',
-      isToggle: true,
-      toggleLabel: showTvlInUsd ? 'TON' : 'USD'
-    },
+    { label: 'TVL', value: formatUSD(tvlUsd || 0), color: 'var(--color-primary)' },
     { label: 'Active Stakers', value: formatNumber(tonstakers.stakersCount || 0, 0), color: 'var(--color-text-primary)' },
   ];
 
@@ -157,24 +179,6 @@ export const EarnPage: React.FC = () => {
               <div className="stat-item">
                 <div style={{ display: 'flex', justifyContent: 'space-between', width: '100%', alignItems: 'center', marginBottom: 'var(--space-2)' }}>
                   <span className="stat-label">{stat.label}</span>
-                  {stat.isToggle && (
-                    <button 
-                      onClick={() => setShowTvlInUsd(!showTvlInUsd)}
-                      style={{
-                        padding: '2px 8px',
-                        background: 'var(--color-primary-soft)',
-                        border: '1px solid var(--color-primary)',
-                        borderRadius: '4px',
-                        fontSize: '10px',
-                        color: 'var(--color-primary)',
-                        cursor: 'pointer',
-                        fontWeight: 700,
-                        textTransform: 'uppercase'
-                      }}
-                    >
-                      {stat.toggleLabel}
-                    </button>
-                  )}
                 </div>
                 {tonstakers.loading && !stat.value ? (
                   <LoadingSkeleton width="100px" height="28px" />
@@ -318,21 +322,30 @@ export const EarnPage: React.FC = () => {
             )}
 
             {/* Action Button */}
-            <button
-              className={`btn ${activeTab === 'stake' ? 'btn-accent' : 'btn-primary'} btn-lg btn-full`}
-              onClick={activeTab === 'stake' ? handleStake : handleUnstake}
-              disabled={amountNum <= 0 || processing || !tonstakers.sdkReady}
-            >
-              {!tonstakers.sdkReady ? (
-                <><span className="animate-spin">⚡</span> Connecting to Tonstakers...</>
-              ) : processing ? (
-                <><span className="animate-spin">⚡</span> Processing...</>
-              ) : activeTab === 'stake' ? (
-                '💎 Stake TON → tsTON'
-              ) : (
-                '🔓 Unstake tsTON → TON'
-              )}
-            </button>
+            {sdkInitFailed ? (
+              <button
+                className="btn btn-primary btn-lg btn-full"
+                onClick={retryInit}
+              >
+                🔄 Retry Connection to Tonstakers
+              </button>
+            ) : (
+              <button
+                className={`btn ${activeTab === 'stake' ? 'btn-accent' : 'btn-primary'} btn-lg btn-full`}
+                onClick={activeTab === 'stake' ? handleStake : handleUnstake}
+                disabled={amountNum <= 0 || processing || !tonstakers.sdkReady}
+              >
+                {!tonstakers.sdkReady ? (
+                  <><span className="animate-spin">⚡</span> Initializing wallet...</>
+                ) : processing ? (
+                  <><span className="animate-spin">⚡</span> Processing...</>
+                ) : activeTab === 'stake' ? (
+                  '💎 Stake TON → tsTON'
+                ) : (
+                  '🔓 Unstake tsTON → TON'
+                )}
+              </button>
+            )}
           </GlassCard>
         </motion.div>
 

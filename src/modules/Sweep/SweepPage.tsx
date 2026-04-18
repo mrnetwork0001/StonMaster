@@ -10,15 +10,12 @@ import { useOmniston } from '@ston-fi/omniston-sdk-react';
 import { Blockchain, SettlementMethod } from '@ston-fi/omniston-sdk';
 import { useWallet } from '../../hooks/useWallet';
 import { GlassModal } from '../../components/common/GlassModal';
-import { TON_NATIVE_ADDRESS, TONAPI_BASE_URL, TONAPI_KEY, DEFAULT_SLIPPAGE_BPS } from '../../utils/constants';
+import { TON_NATIVE_ADDRESS, DEFAULT_SLIPPAGE_BPS } from '../../utils/constants';
+import { getLatestTxInfo, pollForNewTx, tonviewerUrl } from '../../utils/tonExplorer';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 /** Wallet v3/v4 support max 4 outgoing messages per external tx. Wallet v5 supports up to 255. */
 const BATCH_SIZE = 4;
-/** How long to wait between polling attempts (ms) */
-const POLL_INTERVAL = 2500;
-/** Max time to wait for on-chain confirmation before timing out (ms) */
-const CONFIRMATION_TIMEOUT = 60_000;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 type StepStatus = 'pending' | 'quoting' | 'building' | 'sending' | 'confirming' | 'done' | 'error';
@@ -102,37 +99,9 @@ export const SweepPage: React.FC = () => {
   const selectAll     = () => setSelected(new Set(jettons.map(j => j.jetton.address)));
   const clearSelection = () => setSelected(new Set());
 
-  // ─── TonAPI helpers ───────────────────────────────────────────────────────
-  const apiHeaders = useCallback((): Record<string, string> => {
-    if (TONAPI_KEY && TONAPI_KEY !== 'mock_tonapi_key_replace_me')
-      return { Authorization: `Bearer ${TONAPI_KEY}` };
-    return {};
-  }, []);
+  // ─── TonAPI polling ─────────────────────────────────────────────────────────
+  // Handled by shared utilities: getLatestTxInfo / pollForNewTx (tonExplorer.ts)
 
-  /** Returns the logical time (lt) of the most recent tx for the wallet, used as a sync point for polling. */
-  const getLatestTxLt = useCallback(async (): Promise<string | null> => {
-    if (!address) return null;
-    try {
-      const r = await fetch(
-        `${TONAPI_BASE_URL}/blockchain/accounts/${address}/transactions?limit=1`,
-        { headers: apiHeaders() }
-      );
-      if (!r.ok) return null;
-      const d = await r.json();
-      return d.transactions?.[0]?.lt?.toString() ?? null;
-    } catch { return null; }
-  }, [address, apiHeaders]);
-
-  /** Poll TonAPI until a new tx with a different lt appears, or the timeout is reached. */
-  const pollForConfirmation = useCallback(async (prevLt: string | null): Promise<boolean> => {
-    const deadline = Date.now() + CONFIRMATION_TIMEOUT;
-    while (Date.now() < deadline) {
-      await new Promise(r => setTimeout(r, POLL_INTERVAL));
-      const lt = await getLatestTxLt();
-      if (lt !== null && lt !== prevLt) return true;
-    }
-    return false;
-  }, [getLatestTxLt]);
 
   // ─── Omniston helpers ─────────────────────────────────────────────────────
   /** Fetch a swap quote from Omniston using the correct SDK field names.
@@ -254,13 +223,15 @@ export const SweepPage: React.FC = () => {
 
     const successIdxs: number[] = [];
     const batchCount = batches.length;
+    const batchTxHashes: (string | null)[] = []; // one hash per batch for explorer links
 
     for (let b = 0; b < batchCount; b++) {
       const batch = batches[b];
       const batchLabel = batchCount > 1 ? ` (batch ${b + 1}/${batchCount})` : '';
 
-      // Capture current lt BEFORE sending so we can detect the new tx
-      const preSendLt = await getLatestTxLt();
+      // Capture current tx info BEFORE sending so we can detect the new tx and get its hash
+      const preSendInfo = address ? await getLatestTxInfo(address) : null;
+      const preSendLt = preSendInfo?.lt ?? null;
 
       setStatusMessage(`Sign the transaction in your wallet${batchLabel}…`);
       batch.forEach(({ idx }) => updateStep(idx, { status: 'sending' }));
@@ -275,15 +246,16 @@ export const SweepPage: React.FC = () => {
           })),
         });
 
-        // ── Phase 4: Poll for on-chain confirmation ────────────────────────
+        // ── Phase 4: Poll for on-chain confirmation + capture tx hash ─────
         setSweepStatus('confirming');
         setStatusMessage(`Confirming on TON blockchain${batchLabel}…`);
         batch.forEach(({ idx }) => updateStep(idx, { status: 'confirming' }));
 
-        const confirmed = await pollForConfirmation(preSendLt);
+        const confirmedTx = address ? await pollForNewTx(address, preSendLt) : null;
+        batchTxHashes.push(confirmedTx?.hash ?? null);
 
         batch.forEach(({ idx }) => {
-          if (confirmed) {
+          if (confirmedTx) {
             updateStep(idx, { status: 'done' });
           } else {
             // tx was submitted but we timed out waiting — mark done with note
@@ -293,6 +265,7 @@ export const SweepPage: React.FC = () => {
         });
 
       } catch {
+        batchTxHashes.push(null);
         // User cancelled wallet popup or sendTransaction threw
         batch.forEach(({ idx }) => updateStep(idx, { status: 'error', error: 'Transaction rejected or cancelled' }));
       }
@@ -327,6 +300,24 @@ export const SweepPage: React.FC = () => {
             {batchCount > 1 && (
               <div style={{ marginTop: 'var(--space-2)', fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
                 Sent in {batchCount} batches (wallet limit: {BATCH_SIZE} tokens per transaction)
+              </div>
+            )}
+            {/* Explorer links — one per successful batch */}
+            {batchTxHashes.some(h => h !== null) && (
+              <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
+                {batchTxHashes.map((hash, i) =>
+                  hash ? (
+                    <a
+                      key={i}
+                      href={tonviewerUrl(hash)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: 'var(--text-sm)', color: 'var(--color-accent)', fontWeight: 600 }}
+                    >
+                      🔍 {batchCount > 1 ? `Batch ${i + 1}: ` : ''}View in Explorer ↗
+                    </a>
+                  ) : null
+                )}
               </div>
             )}
           </div>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useWallet } from './useWallet';
 import { fetchJettonBalances, fetchTonBalance, getJettonUsdValue } from '../services/tonapi';
 import type { JettonBalance } from '../services/tonapi';
@@ -15,14 +15,19 @@ export function useJettonBalances(dustThreshold: number = 1.0) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const hasLoadedRef = useRef(false);
+
   const refresh = useCallback(async () => {
     if (!address) {
       setJettons([]);
       setTonBalance('0');
+      hasLoadedRef.current = false;
       return;
     }
 
-    setLoading(true);
+    // Only show the loading skeleton on the very first fetch for this address.
+    // Background refreshes keep existing data visible.
+    if (!hasLoadedRef.current) setLoading(true);
     setError(null);
 
     try {
@@ -51,12 +56,14 @@ export function useJettonBalances(dustThreshold: number = 1.0) {
 
       setJettons(enriched);
       setTonBalance(tonBal);
+      hasLoadedRef.current = true;
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch balances');
     } finally {
       setLoading(false);
     }
   }, [address, dustThreshold]);
+
 
   useEffect(() => {
     refresh();
