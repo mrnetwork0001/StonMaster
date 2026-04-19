@@ -4,6 +4,7 @@ import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { TokenIcon } from '../../components/common/TokenIcon';
+import { AppIcon } from '../../components/common/AppIcon';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Address, Cell } from '@ton/core';
 import { createShortLink, getShortLink } from '../../services/supabase';
