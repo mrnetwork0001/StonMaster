@@ -1,6 +1,7 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import { AppIcon } from '../components/common/AppIcon';
 
 const fadeUp = {
   hidden: { opacity: 0, y: 24 },
@@ -13,17 +14,17 @@ const fadeUp = {
 
 const features = [
   {
-    icon: '🧹',
+    icon: 'sweep' as const,
     title: 'StonSweep',
     desc: 'Scan your wallet for dust tokens and batch-swap them into TON with one click via Omniston.',
   },
   {
-    icon: '📈',
+    icon: 'gem' as const,
     title: 'Yield Maximizer',
     desc: 'Stake TON with Tonstakers for liquid staking yields. Live APY, TVL tracking, and instant actions.',
   },
   {
-    icon: '🔗',
+    icon: 'link' as const,
     title: 'SocialSwap',
     desc: 'Build shareable trade strategies with referral links. Followers execute real swaps - you earn fees.',
   },
@@ -41,7 +42,7 @@ export const LandingPage: React.FC = () => {
           <span className="landing-logo-text">StonMaster</span>
         </div>
         <button className="landing-nav-btn" onClick={() => navigate('/app')}>
-          Launch App →
+          Launch App
         </button>
       </nav>
 
@@ -67,7 +68,9 @@ export const LandingPage: React.FC = () => {
 
             <motion.div className="landing-cta-row" custom={3} variants={fadeUp}>
               <button className="landing-cta-primary" onClick={() => navigate('/app')}>
-                🚀 Enter Dashboard
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                  <AppIcon name="zap" size={18} color="white" /> Enter Dashboard
+                </span>
               </button>
               <a
                 href="https://docs.ston.fi"
@@ -75,7 +78,7 @@ export const LandingPage: React.FC = () => {
                 rel="noopener noreferrer"
                 className="landing-cta-ghost"
               >
-                Read Docs →
+                Read Docs
               </a>
             </motion.div>
           </motion.div>
@@ -89,7 +92,9 @@ export const LandingPage: React.FC = () => {
           >
             <div className="landing-orb">
               <div className="landing-orb-inner">
-                <div className="landing-orb-core">💎</div>
+                <div className="landing-orb-core">
+                  <AppIcon name="gem" size={48} color="white" strokeWidth={1.5} />
+                </div>
               </div>
             </div>
           </motion.div>
@@ -111,7 +116,9 @@ export const LandingPage: React.FC = () => {
               viewport={{ once: true }}
               transition={{ delay: i * 0.12, duration: 0.5, ease: [0.16, 1, 0.3, 1] as const }}
             >
-              <div className="landing-feature-icon">{f.icon}</div>
+              <div className="landing-feature-icon">
+                <AppIcon name={f.icon} size={26} color="var(--color-accent)" strokeWidth={1.7} />
+              </div>
               <h3 className="landing-feature-title">{f.title}</h3>
               <p className="landing-feature-desc">{f.desc}</p>
             </motion.div>
@@ -149,7 +156,9 @@ export const LandingPage: React.FC = () => {
             Connect your wallet and start sweeping, staking, and sharing.
           </p>
           <button className="landing-cta-primary" onClick={() => navigate('/app')}>
-            💎 Enter StonMaster
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <AppIcon name="zap" size={18} color="white" /> Enter StonMaster
+            </span>
           </button>
         </motion.div>
       </section>
