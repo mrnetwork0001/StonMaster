@@ -8,6 +8,7 @@ import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
 import { useTonstakers } from '../../hooks/useTonstakers';
 import { formatTON, formatPercent, formatNumber, formatUSD, nanoToTon, tonToNano } from '../../utils/formatters';
 import { tonviewerUrl } from '../../utils/tonExplorer';
+import { DEFAULT_TOKENS } from '../../utils/constants';
 
 type Tab = 'stake' | 'unstake';
 type UnstakeMode = 'standard' | 'instant' | 'bestRate';
@@ -266,9 +267,9 @@ export const EarnPage: React.FC = () => {
                 <div className="earn-token-badge">
                   <div className="earn-token-icon">
                     {activeTab === 'stake' ? (
-                      <AppIcon name="gem" size={20} color="var(--color-accent)" />
+                      <img src={DEFAULT_TOKENS[0].icon} alt="TON" style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                     ) : (
-                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#e8a014' }}>ts</span>
+                      <img src={DEFAULT_TOKENS[3].icon} alt="tsTON" style={{ width: '24px', height: '24px', borderRadius: '50%' }} />
                     )}
                   </div>
                   <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
