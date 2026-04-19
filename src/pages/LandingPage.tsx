@@ -157,7 +157,7 @@ export const LandingPage: React.FC = () => {
 
       {/* ── Footer ── */}
       <footer className="landing-footer">
-        <span>© 2025 StonMaster - Built for the STON.fi Hackathon</span>
+        <span>Built by <a href="https://x.com/encrypt_wizard" target="_blank" rel="noopener noreferrer" style={{ color: 'inherit', textDecoration: 'underline' }}>MrNetwork</a>, for the STON.fi Hackathon</span>
         <div className="landing-footer-links">
           <a href="https://ston.fi" target="_blank" rel="noopener noreferrer">STON.fi</a>
           <a href="https://ton.org" target="_blank" rel="noopener noreferrer">TON</a>
