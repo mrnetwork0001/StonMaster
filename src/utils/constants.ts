@@ -17,7 +17,7 @@ export const DEFAULT_TOKENS: Token[] = [
   {
     address: 'EQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAM9c',
     symbol: 'TON', name: 'Toncoin', decimals: 9, verification: 'whitelist',
-    icon: 'https://ton.org/download/ton_symbol.png',
+    icon: 'https://static.ston.fi/logo/ton_symbol.png',
   },
   {
     address: 'EQCxE6mUtQJKFnGfaROTKOt1lZbDiiX1kCixRv7Nw2Id_sDs',
@@ -32,12 +32,12 @@ export const DEFAULT_TOKENS: Token[] = [
   {
     address: 'EQC98_qAmNEptUtPc7W6xdHh_ZHrBUFpw5Ft_IzNU20QAJav',
     symbol: 'tsTON', name: 'Tonstakers TON', decimals: 9, verification: 'whitelist',
-    icon: 'https://api.tonstakers.com/static/tsTON.png',
+    icon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyMDAgMjAwIj48Y2lyY2xlIGN4PSIxMDAiIGN5PSIxMDAiIHI9IjEwMCIgZmlsbD0iIzAwOThFQSIvPjx0ZXh0IHg9IjEwMCIgeT0iMTE1IiBmb250LWZhbWlseT0iSW50ZXIsIHNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iNDgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjRkZGRkZGIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj50c1RPTjwvdGV4dD48L3N2Zz4=',
   },
   {
     address: 'EQA2kCVNwVsil2EM2mB0SkXytxCqQjS4mttjDpnXmn32llF6',
     symbol: 'STON', name: 'STON.fi', decimals: 9, verification: 'whitelist',
-    icon: 'https://static.ston.fi/tokens/ston.svg',
+    icon: 'https://static.ston.fi/logo/ston_symbol.png',
   },
 ];
 
