@@ -309,6 +309,7 @@ export const LandingPage: React.FC = () => {
         .landing-cta-primary {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           gap: var(--space-2);
           padding: var(--space-4) var(--space-8);
           background: linear-gradient(135deg, var(--color-accent), var(--color-accent-light));
@@ -336,6 +337,7 @@ export const LandingPage: React.FC = () => {
         .landing-cta-ghost {
           display: inline-flex;
           align-items: center;
+          justify-content: center;
           padding: var(--space-4) var(--space-6);
           background: var(--color-bg);
           color: var(--color-fg);
@@ -594,7 +596,8 @@ export const LandingPage: React.FC = () => {
           }
           .landing-cta-row {
             flex-direction: column;
-            align-items: stretch;
+            align-items: center;
+            justify-content: center;
           }
           .landing-features-grid,
           .landing-stats-grid {
