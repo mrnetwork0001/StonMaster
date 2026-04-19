@@ -50,10 +50,6 @@ export const LandingPage: React.FC = () => {
       <section className="landing-hero">
         <div className="landing-hero-inner">
           <motion.div className="landing-hero-content" initial="hidden" animate="visible">
-            <motion.div className="landing-tag" custom={0} variants={fadeUp}>
-              <span className="landing-tag-dot" />
-              Built on STON.fi Omniston
-            </motion.div>
 
             <motion.h1 className="landing-h1" custom={1} variants={fadeUp}>
               Your All-in-One
