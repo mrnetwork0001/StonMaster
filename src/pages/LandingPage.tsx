@@ -64,9 +64,7 @@ export const LandingPage: React.FC = () => {
 
             <motion.div className="landing-cta-row" custom={3} variants={fadeUp}>
               <button className="landing-cta-primary" onClick={() => navigate('/app')}>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-                  <AppIcon name="zap" size={18} color="white" /> Enter Dashboard
-                </span>
+                Enter Dashboard
               </button>
               <a
                 href="https://docs.ston.fi"
@@ -152,9 +150,7 @@ export const LandingPage: React.FC = () => {
             Connect your wallet and start sweeping, staking, and sharing.
           </p>
           <button className="landing-cta-primary" onClick={() => navigate('/app')}>
-            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
-              <AppIcon name="zap" size={18} color="white" /> Enter StonMaster
-            </span>
+            Enter StonMaster
           </button>
         </motion.div>
       </section>
