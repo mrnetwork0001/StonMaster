@@ -27,7 +27,7 @@ const itemVariants = {
 
 export const Dashboard: React.FC = () => {
   const { address } = useWallet();
-  const { totalDustValue, totalValue, clutterScore, dustJettons, loading } = useJettonBalances();
+  const { totalDustValue, totalValue, clutterScore, dustJettons } = useJettonBalances();
   // useTonBalance is a dedicated single-call hook — much faster than the combined
   // useJettonBalances fetch, so the balance renders almost immediately on mount.
   const { balance: tonBalanceNano, loading: tonLoading } = useTonBalance();

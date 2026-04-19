@@ -1,5 +1,6 @@
 import { useTonConnectUI, useTonAddress, useTonWallet } from '@tonconnect/ui-react';
-import { Address, Sender, SenderArguments } from '@ton/core';
+import { Address } from '@ton/core';
+import type { Sender, SenderArguments } from '@ton/core';
 import { useMemo } from 'react';
 
 export function useWallet() {

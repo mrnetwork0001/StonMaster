@@ -237,9 +237,9 @@ export const EarnPage: React.FC = () => {
                 >
                   <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                     {[
-                      { mode: 'standard' as const, icon: '', label: 'Standard', desc: 'Next round' },
+                      { mode: 'standard' as const, icon: null, label: 'Standard', desc: 'Next round' },
                       { mode: 'instant' as const, icon: 'zap' as const, label: 'Instant', desc: 'Immediate' },
-                      { mode: 'bestRate' as const, icon: '📈', label: 'Best Rate', desc: 'Optimised' },
+                      { mode: 'bestRate' as const, icon: 'arrow-up-right' as const, label: 'Best Rate', desc: 'Optimised' },
                     ].map((opt) => (
                       <button
                         key={opt.mode}

@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 interface ModuleCardProps {
   to: string;
   variant: 'sweep' | 'earn' | 'share';
-  icon: string;
+  icon: React.ReactNode;
   title: string;
   description: string;
   cta: string;
