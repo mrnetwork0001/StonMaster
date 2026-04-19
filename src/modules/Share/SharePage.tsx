@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
@@ -15,6 +15,7 @@ import { DEFAULT_TOKENS, TON_NATIVE_ADDRESS } from '../../utils/constants';
 import type { Token } from '../../utils/constants';
 import { fetchJettonMetadata } from '../../services/tonapi';
 import { tonToNano, nanoToTon } from '../../utils/formatters';
+import { getLatestTxInfo, pollForNewTx, tonviewerUrl } from '../../utils/tonExplorer';
 
 // Populated from DEFAULT_TOKENS constant
 
@@ -289,6 +290,9 @@ export const SharePage: React.FC = () => {
       onConfirm: async () => {
         setCreatingLink(true);
         try {
+          // Capture latest tx before broadcast so we can detect the new one
+          const before = await getLatestTxInfo(address!).catch(() => null);
+
           const tx = await omniston.buildTransfer({
             sourceAddress: { blockchain: 607, address: address! },
             destinationAddress: { blockchain: 607, address: address! },
@@ -309,12 +313,89 @@ export const SharePage: React.FC = () => {
             body: Cell.fromBoc(Buffer.from(message.payload, 'base64'))[0],
           });
 
+          // ── Success icon — same design as AdvancedSwap ──────────────────
+          const SuccessIcon = () => (
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%',
+              background: 'linear-gradient(135deg, hsl(165, 64%, 38%), hsl(195, 78%, 50%))',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto var(--space-5)',
+              boxShadow: '0 8px 32px hsla(165, 64%, 38%, 0.40), 0 2px 6px rgba(0,0,0,0.12)',
+            }}>
+              <svg width="34" height="34" viewBox="0 0 24 24" fill="none"
+                stroke="white" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12" />
+              </svg>
+            </div>
+          );
+
+          // Phase 1: show immediately with "locating tx..."
           setModal({
             isOpen: true,
-            title: 'Swap Sent! 🚀',
+            title: 'Trade Strategy Executed',
             type: 'success',
-            content: `Your trade strategy has been broadcast to the TON network. Check your wallet for confirmation.`,
+            content: (
+              <div style={{ textAlign: 'center' }}>
+                <SuccessIcon />
+                <p style={{ fontWeight: 600, fontSize: 'var(--text-base)', marginBottom: 'var(--space-2)' }}>
+                  Your trade strategy has been broadcast to the TON network.
+                </p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)', marginBottom: 'var(--space-4)' }}>
+                  Balances update in ~30 seconds.
+                </p>
+                <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-muted)', opacity: 0.7 }}>
+                  Locating transaction...
+                </div>
+              </div>
+            ),
           });
+
+          // Phase 2: poll for tx hash in background then update with explorer link
+          pollForNewTx(address!, before?.lt ?? null).then(found => {
+            if (!found?.hash) return;
+            const url = tonviewerUrl(found.hash);
+            setModal(prev => ({
+              ...prev,
+              content: (
+                <div style={{ textAlign: 'center' }}>
+                  <SuccessIcon />
+                  <p style={{ fontWeight: 600, fontSize: 'var(--text-base)', marginBottom: 'var(--space-2)' }}>
+                    Your trade strategy has been broadcast to the TON network.
+                  </p>
+                  <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)', marginBottom: 'var(--space-5)' }}>
+                    Balances update in ~30 seconds.
+                  </p>
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      display: 'inline-flex', alignItems: 'center', gap: '6px',
+                      padding: 'var(--space-2) var(--space-5)',
+                      borderRadius: 'var(--radius-full)',
+                      background: 'var(--color-bg)',
+                      boxShadow: 'var(--neu-extruded-sm)',
+                      fontSize: 'var(--text-sm)', fontWeight: 600,
+                      color: 'var(--color-accent)',
+                      textDecoration: 'none',
+                      transition: 'box-shadow 200ms',
+                    }}
+                    onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--neu-extruded)')}
+                    onMouseLeave={e => (e.currentTarget.style.boxShadow = 'var(--neu-extruded-sm)')}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"
+                      stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      <polyline points="15 3 21 3 21 9" />
+                      <line x1="10" y1="14" x2="21" y2="3" />
+                    </svg>
+                    View on TonViewer
+                  </a>
+                </div>
+              ),
+            }));
+          }).catch(() => { /* silently ignore if poll times out */ });
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
           console.error('Follow trade failed:', err);
@@ -322,7 +403,27 @@ export const SharePage: React.FC = () => {
             isOpen: true,
             title: 'Trade Failed',
             type: 'error',
-            content: err.message || 'The transaction was cancelled or failed to broadcast.',
+            content: (
+              <div style={{ textAlign: 'center' }}>
+                <div style={{
+                  width: 64, height: 64, borderRadius: '50%',
+                  background: 'linear-gradient(135deg, hsl(0, 68%, 52%), hsl(20, 80%, 55%))',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto var(--space-4)',
+                  boxShadow: '0 6px 24px hsla(0, 68%, 52%, 0.35)',
+                }}>
+                  <svg width="30" height="30" viewBox="0 0 24 24" fill="none"
+                    stroke="white" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </div>
+                <p style={{ fontWeight: 600, marginBottom: 'var(--space-2)' }}>Trade execution failed</p>
+                <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-muted)' }}>
+                  {err.message || 'The transaction was cancelled or failed to broadcast.'}
+                </p>
+              </div>
+            ),
           });
         } finally {
           setCreatingLink(false);
