@@ -26,6 +26,9 @@ Built natively on STON.fi Omniston for the TON ecosystem.
 
 ## Short Description
 
+<img width="1910" height="821" alt="19 04 2026_22 35 50_REC" src="https://github.com/user-attachments/assets/1258f42f-646b-4b46-a188-419f1f75ade2" />
+
+
 Most TON wallet holders face three silent problems:
 
 1. **Wallet clutter** - small "dust" token balances accumulate but cost more gas to sell than they're worth
