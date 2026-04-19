@@ -21,7 +21,7 @@ const FALLBACK_RATES    = { TONUSD: 3.2, tsTONTON: 1.096, tsTONTONProjected: 1.1
 const FALLBACK_LIQ_NANO = 1_656_991 * 1e9;     // from last known instantLiquidity
 
 // ─── Tonstakers official cache endpoint ─────────────────────────────────────
-// Primary source — single call, no auth needed, matches exactly what
+// Primary source - single call, no auth needed, matches exactly what
 // the tonstakers.com dashboard displays.
 const TONSTAKERS_CACHE_URL = 'https://api.tonstakers.com/cache/v1/blockchain/staking';
 
@@ -44,7 +44,7 @@ async function fetchPoolStatsFromTonstakers(): Promise<TonstakersPoolStats> {
   const d = json.data?.staking_data;
   if (!d) throw new Error('Tonstakers cache: missing staking_data');
 
-  // Extract TON/USD from the Tonstakers rates map — this is the same price
+  // Extract TON/USD from the Tonstakers rates map - this is the same price
   // the Tonstakers dashboard uses, ensuring our TVL USD value matches.
   const rates = json.data?.rates ?? {};
   const TONUSD = Number(rates[TON_ZERO_ADDRESS] ?? FALLBACK_RATES.TONUSD);
@@ -93,7 +93,7 @@ interface TonstakersState {
   sdkReady: boolean;
   sdkInitFailed: boolean;  // true after all retry attempts exhausted
   apy: number;
-  tvl: string;             // nanoTON string — consumed by nanoToTon() in EarnPage
+  tvl: string;             // nanoTON string - consumed by nanoToTon() in EarnPage
   stakersCount: number;
   stakedBalance: string;   // tsTON jetton balance in nanoTON (from TonAPI, not SDK)
   rates: {
@@ -110,7 +110,7 @@ export function useTonstakers() {
   const [tonConnectUI] = useTonConnectUI();
   const { address } = useWallet();
 
-  // Real wallet TON balance from TonAPI — displayed as "Available" on the stake page
+  // Real wallet TON balance from TonAPI - displayed as "Available" on the stake page
   const { balance: walletBalanceNano, refresh: refreshBalance } = useTonBalance();
 
   const sdkRef        = useRef<Tonstakers | null>(null);
@@ -127,7 +127,7 @@ export function useTonstakers() {
     tvl:              String(FALLBACK_TVL_NANO),
     stakersCount:     FALLBACK_STAKERS,
     stakedBalance:    '0',
-    rates:            { ...FALLBACK_RATES },   // includes TONUSD — prevents $0 portfolio flash
+    rates:            { ...FALLBACK_RATES },   // includes TONUSD - prevents $0 portfolio flash
     instantLiquidity: String(FALLBACK_LIQ_NANO),
     loading:          true,   // true only until the first real fetch completes
     error:            null,
@@ -141,7 +141,7 @@ export function useTonstakers() {
   // ─── Fetch real tsTON jetton balance directly from TonAPI ─────────────────
   // More reliable than SDK.getStakedBalance() which requires internal SDK setup.
   // TonAPI returns jetton.address in raw hex form (0:xxx...) while TSTON_ADDRESS
-  // is stored in user-friendly EQ form — normalize both with @ton/core before comparing.
+  // is stored in user-friendly EQ form - normalize both with @ton/core before comparing.
   const fetchTstonBalance = useCallback(async (): Promise<string> => {
     if (!address) return '0';
     try {
@@ -163,9 +163,9 @@ export function useTonstakers() {
     }
   }, [address]);
 
-  // ─── Fetch global pool stats — primary: Tonstakers cache, fallback: TonAPI ──
+  // ─── Fetch global pool stats - primary: Tonstakers cache, fallback: TonAPI ──
   // A single call to Tonstakers returns APY, TVL, stakers, tsTONPrice, and
-  // instantLiquidity — no SDK or wallet needed. Matches the official dashboard.
+  // instantLiquidity - no SDK or wallet needed. Matches the official dashboard.
   const refreshStats = useCallback(async () => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
@@ -177,7 +177,7 @@ export function useTonstakers() {
 
     try {
       const [poolStats, tstonBalanceNano] = await Promise.all([
-        // Primary: official Tonstakers cache — includes TONUSD from their own rates map
+        // Primary: official Tonstakers cache - includes TONUSD from their own rates map
         // Fallback chain: TonAPI (with its own price fetch) → hardcoded constants
         fetchPoolStatsFromTonstakers().catch(async (e) => {
           console.warn('[Tonstakers] Primary endpoint failed, trying TonAPI fallback:', e);
@@ -234,7 +234,7 @@ export function useTonstakers() {
   }, [fetchTstonBalance]);
 
 
-  /** Alias kept for compatibility — now delegates to refreshStats */
+  /** Alias kept for compatibility - now delegates to refreshStats */
   const refresh = refreshStats;
 
   /** Call this from the UI to force a fresh SDK instantiation after a failed init. */
@@ -245,7 +245,7 @@ export function useTonstakers() {
     setRetryCount(c => c + 1);
   }, []);
 
-  // ─── Pool stats — fetched directly from TonAPI, no SDK needed ───────────────
+  // ─── Pool stats - fetched directly from TonAPI, no SDK needed ───────────────
   // Runs immediately on mount and every 90s. Provides APY, TVL, stakers count.
   useEffect(() => {
     let destroyed = false;
@@ -319,13 +319,13 @@ export function useTonstakers() {
       if (pollElapsed >= POLL_TIMEOUT_MS) {
         clearInterval(pollTimer);
         if (retryCount < MAX_AUTO_RETRIES) {
-          console.warn(`[Tonstakers] SDK timeout — auto-retry ${retryCount + 1}/${MAX_AUTO_RETRIES}`);
+          console.warn(`[Tonstakers] SDK timeout - auto-retry ${retryCount + 1}/${MAX_AUTO_RETRIES}`);
           setTimeout(() => {
             if (!destroyed) setRetryCount(c => c + 1);
           }, 1_000);
         } else {
-          console.error('[Tonstakers] All SDK retries exhausted — showing Retry button');
-          // Stats already loaded — just mark SDK init failed so stake button
+          console.error('[Tonstakers] All SDK retries exhausted - showing Retry button');
+          // Stats already loaded - just mark SDK init failed so stake button
           // shows the retry instead of an infinite loader
           setState(prev => ({ ...prev, sdkInitFailed: true, loading: false }));
         }
@@ -350,38 +350,85 @@ export function useTonstakers() {
   }, [address]);
 
   // ─── Transaction helpers ────────────────────────────────────────────────────
-  /** Stakes TON. Returns the on-chain tx hash for the explorer link, or null on timeout. */
+
+  /** Wait up to 10s for the SDK instance to exist (set almost immediately on mount).
+   *  Does NOT wait for sdk.ready — that check is done via withSdkRetry retries. */
+  const waitForSdk = (): Promise<Tonstakers | undefined> => {
+    return new Promise((resolve) => {
+      // Instance is normally set synchronously during the useEffect — resolve right away.
+      const sdk = sdkRef.current;
+      if (sdk) return resolve(sdk);
+      const deadline = Date.now() + 10_000;
+      const id = setInterval(() => {
+        const s = sdkRef.current;
+        if (s) { clearInterval(id); resolve(s); }
+        else if (Date.now() >= deadline) { clearInterval(id); resolve(undefined); }
+      }, 150);
+    });
+  };
+
+  /** Returns true if an error is the SDK's own internal "not ready" error. */
+  const isSdkNotReady = (err: unknown) => {
+    if (!(err instanceof Error)) return false;
+    const msg = err.message.toLowerCase();
+    return msg.includes('not fully initialized') || msg.includes('not initialized') || msg.includes('not ready');
+  };
+
+  /** Generic retry wrapper — retries up to 6 times on SDK-not-ready errors, 2s apart.
+   *  Gives the SDK up to 12 seconds to finish its internal initialization. */
+  async function withSdkRetry<T>(fn: (sdk: Tonstakers) => Promise<T>): Promise<T> {
+    const sdk = await waitForSdk();
+    if (!sdk) throw new Error('Tonstakers SDK not initialized. Please refresh the page and try again.');
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      try {
+        return await fn(sdk);
+      } catch (err) {
+        if (isSdkNotReady(err)) {
+          lastErr = err;
+          console.warn(`[Tonstakers] SDK not ready (attempt ${attempt + 1}/6): ${(err as Error).message} — retrying in 2s`);
+          await new Promise(r => setTimeout(r, 2_000));
+        } else {
+          throw err; // user rejected, network error, etc. — rethrow immediately
+        }
+      }
+    }
+    throw lastErr ?? new Error('Stake failed after retries. Please try again.');
+  }
+
+  /** Stakes TON. Returns the onchain tx hash for the explorer link, or null on timeout. */
   const stake = async (amountNano: string): Promise<string | null> => {
-    const sdk = sdkRef.current;
-    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
-    const before = await getLatestTxInfo(address ?? '');
-    await sdk.stake(BigInt(amountNano));
-    const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
-    await Promise.all([refresh(), refreshBalance()]);
-    return tx?.hash ?? null;
+    return withSdkRetry(async (sdk) => {
+      const before = await getLatestTxInfo(address ?? '');
+      await sdk.stake(BigInt(amountNano));
+      const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
+      await Promise.all([refresh(), refreshBalance()]);
+      return tx?.hash ?? null;
+    });
   };
 
-  /** Unstakes tsTON (standard). Returns the on-chain tx hash or null. */
+  /** Unstakes tsTON (standard). Returns the onchain tx hash or null. */
   const unstake = async (amountNano: string): Promise<string | null> => {
-    const sdk = sdkRef.current;
-    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
-    const before = await getLatestTxInfo(address ?? '');
-    await sdk.unstake(BigInt(amountNano));
-    const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
-    await Promise.all([refresh(), refreshBalance()]);
-    return tx?.hash ?? null;
+    return withSdkRetry(async (sdk) => {
+      const before = await getLatestTxInfo(address ?? '');
+      await sdk.unstake(BigInt(amountNano));
+      const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
+      await Promise.all([refresh(), refreshBalance()]);
+      return tx?.hash ?? null;
+    });
   };
 
-  /** Unstakes tsTON instantly. Returns the on-chain tx hash or null. */
+  /** Unstakes tsTON instantly. Returns the onchain tx hash or null. */
   const unstakeInstant = async (amountNano: string): Promise<string | null> => {
-    const sdk = sdkRef.current;
-    if (!sdk) throw new Error('Tonstakers SDK is not initialized.');
-    const before = await getLatestTxInfo(address ?? '');
-    await sdk.unstakeInstant(BigInt(amountNano));
-    const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
-    await Promise.all([refresh(), refreshBalance()]);
-    return tx?.hash ?? null;
+    return withSdkRetry(async (sdk) => {
+      const before = await getLatestTxInfo(address ?? '');
+      await sdk.unstakeInstant(BigInt(amountNano));
+      const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
+      await Promise.all([refresh(), refreshBalance()]);
+      return tx?.hash ?? null;
+    });
   };
+
 
   return {
     ...state,

@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo } from 'react';
+﻿import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { TokenIcon } from '../../components/common/TokenIcon';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Address, Cell } from '@ton/core';
 import { createShortLink, getShortLink } from '../../services/supabase';
@@ -82,7 +83,7 @@ export const SharePage: React.FC = () => {
       
       const exists = [...DEFAULT_TOKENS, ...customTokens].find(t => t.address === searchAddress);
       if (exists) {
-        // Token already in list — auto-select it
+        // Token already in list - auto-select it
         if (showCustomInput === 'from') setFromToken(exists);
         if (showCustomInput === 'to') setToToken(exists);
         setSearchAddress('');
@@ -391,7 +392,7 @@ export const SharePage: React.FC = () => {
                       onClick={() => { setFromDropdownOpen(!fromDropdownOpen); setToDropdownOpen(false); }}
                     >
                       <span className="token-dropdown-selected">
-                        <span style={{ fontSize: '1.2rem' }}>{fromToken.icon || '💎'}</span>
+                        <TokenIcon src={fromToken.icon} symbol={fromToken.symbol} size={24} />
                         <span className="token-dropdown-name">{fromToken.symbol}</span>
                         {fromToken.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
                         {fromToken.verification === 'none' && fromToken.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
@@ -407,7 +408,7 @@ export const SharePage: React.FC = () => {
                             className={`token-dropdown-item ${fromToken.address === token.address ? 'active' : ''}`}
                             onClick={() => { setFromToken(token); setFromDropdownOpen(false); }}
                           >
-                            <span style={{ fontSize: '1.1rem' }}>{token.icon || '💎'}</span>
+                            <TokenIcon src={token.icon} symbol={token.symbol} size={22} />
                             <span className="token-dropdown-item-name">{token.name}</span>
                             <span className="token-dropdown-item-symbol">{token.symbol}</span>
                             {token.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
@@ -449,7 +450,7 @@ export const SharePage: React.FC = () => {
                       onClick={() => { setToDropdownOpen(!toDropdownOpen); setFromDropdownOpen(false); }}
                     >
                       <span className="token-dropdown-selected">
-                        <span style={{ fontSize: '1.2rem' }}>{toToken.icon || '💰'}</span>
+                        <TokenIcon src={toToken.icon} symbol={toToken.symbol} size={24} />
                         <span className="token-dropdown-name">{toToken.symbol}</span>
                         {toToken.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
                         {toToken.verification === 'none' && toToken.address !== TON_NATIVE_ADDRESS && <span className="token-unverified-badge">⚠️</span>}
@@ -465,7 +466,7 @@ export const SharePage: React.FC = () => {
                             className={`token-dropdown-item ${toToken.address === token.address ? 'active' : ''}`}
                             onClick={() => { setToToken(token); setToDropdownOpen(false); }}
                           >
-                            <span style={{ fontSize: '1.1rem' }}>{token.icon || '💰'}</span>
+                            <TokenIcon src={token.icon} symbol={token.symbol} size={22} />
                             <span className="token-dropdown-item-name">{token.name}</span>
                             <span className="token-dropdown-item-symbol">{token.symbol}</span>
                             {token.verification === 'whitelist' && <span className="token-verified-badge">✓</span>}
@@ -518,13 +519,13 @@ export const SharePage: React.FC = () => {
               <div className="strategy-display">
                 <div className="strategy-tokens">
                   <div className="strategy-token">
-                    <div style={{ fontSize: '2.5rem' }}>{fromToken.icon || '💎'}</div>
+                    <TokenIcon src={fromToken.icon} symbol={fromToken.symbol} size={52} style={{ margin: '0 auto var(--space-2)' }} />
                     <div style={{ fontWeight: 600 }}>{amount}</div>
                     <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{fromToken.symbol}</div>
                   </div>
                   <div className="strategy-arrow">→</div>
                   <div className="strategy-token">
-                    <div style={{ fontSize: '2.5rem' }}>{toToken.icon || '💰'}</div>
+                    <TokenIcon src={toToken.icon} symbol={toToken.symbol} size={52} style={{ margin: '0 auto var(--space-2)' }} />
                     <div style={{ fontWeight: 600, color: 'var(--color-accent)' }}>~{estimatedOutput}</div>
                     <div style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>{toToken.symbol}</div>
                   </div>
@@ -537,12 +538,12 @@ export const SharePage: React.FC = () => {
               <div style={{ padding: 'var(--space-4)', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', marginBottom: 'var(--space-6)', boxShadow: 'var(--neu-inset-sm)' }}>
                 <div className="strategy-tokens" style={{ margin: 'var(--space-2) 0' }}>
                   <div className="strategy-token">
-                    <span style={{ fontSize: '1.5rem' }}>{fromToken.icon}</span>
+                    <TokenIcon src={fromToken.icon} symbol={fromToken.symbol} size={32} />
                     <strong>{amount} {fromToken.symbol}</strong>
                   </div>
                   <div className="strategy-arrow">→</div>
                   <div className="strategy-token">
-                    <span style={{ fontSize: '1.5rem' }}>{toToken.icon}</span>
+                    <TokenIcon src={toToken.icon} symbol={toToken.symbol} size={32} />
                     <strong style={{ color: estimatedOutput ? 'var(--color-accent)' : 'var(--color-muted)' }}>
                       {isQuoting
                         ? '⏳ Fetching quote...'
@@ -554,7 +555,7 @@ export const SharePage: React.FC = () => {
                 </div>
                 {!isQuoting && !estimatedOutput && (
                   <p style={{ fontSize: 'var(--text-xs)', color: 'var(--color-muted)', textAlign: 'center', marginTop: 'var(--space-2)' }}>
-                    Omniston API may be temporarily down. You can still generate a strategy link — the recipient will get a live quote when they open it.
+                    Omniston API may be temporarily down. You can still generate a strategy link - the recipient will get a live quote when they open it.
                   </p>
                 )}
               </div>

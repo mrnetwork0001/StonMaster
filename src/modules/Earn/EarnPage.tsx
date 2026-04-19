@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { motion } from 'framer-motion';
+﻿import React, { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../../hooks/useWallet';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
@@ -37,7 +37,6 @@ export const EarnPage: React.FC = () => {
     type: 'info'
   });
 
-  // Extremely defensive calculations
   const safeNum = (val: unknown) => {
     const n = Number(val);
     return isNaN(n) ? 0 : n;
@@ -46,7 +45,7 @@ export const EarnPage: React.FC = () => {
   const amountNum = parseFloat(amount) || 0;
   const availableTon = nanoToTon(safeNum(tonstakers.availableBalance));
   const stakedTsTon = nanoToTon(safeNum(tonstakers.stakedBalance));
-  
+
   const rawTvl = safeNum(tonstakers.tvl);
   const tvlTon = nanoToTon(rawTvl);
   const tonPrice = safeNum(tonstakers.rates?.TONUSD);
@@ -135,9 +134,10 @@ export const EarnPage: React.FC = () => {
     }
   };
 
+  // MAX shows the full balance - the SDK handles gas internally
   const setMaxAmount = () => {
     if (activeTab === 'stake') {
-      setAmount(Math.max(0, availableTon - 1.1).toFixed(4)); // Reserve 1.1 TON for fees
+      setAmount(availableTon.toFixed(4));
     } else {
       setAmount(stakedTsTon.toFixed(4));
     }
@@ -197,100 +197,128 @@ export const EarnPage: React.FC = () => {
         {/* Staking Panel */}
         <motion.div variants={itemVariants} initial="hidden" animate="visible">
           <GlassCard glow="green">
-            {/* Tab Switcher */}
-            <div className="tabs" style={{ marginBottom: 'var(--space-6)' }}>
-              <button
-                className={`tab ${activeTab === 'stake' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('stake'); setAmount(''); }}
-              >
-                💎 Stake
-              </button>
-              <button
-                className={`tab ${activeTab === 'unstake' ? 'active' : ''}`}
-                onClick={() => { setActiveTab('unstake'); setAmount(''); }}
-              >
-                🔓 Unstake
-              </button>
+
+            {/* ── Premium Pill Toggle ── */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-6)' }}>
+              <div className="earn-tab-toggle">
+                <button
+                  className={`earn-tab-btn ${activeTab === 'stake' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('stake'); setAmount(''); }}
+                >
+                  Stake
+                </button>
+                <button
+                  className={`earn-tab-btn ${activeTab === 'unstake' ? 'active' : ''}`}
+                  onClick={() => { setActiveTab('unstake'); setAmount(''); }}
+                >
+                  Unstake
+                </button>
+              </div>
+
+              {/* APY badge */}
+              <div className="earn-apy-badge">
+                <span style={{ fontSize: '10px', opacity: 0.7, marginRight: '4px' }}>APY</span>
+                {formatPercent(tonstakers.apy)}
+              </div>
             </div>
 
-            {/* Amount Input */}
-            <div className="input-group" style={{ marginBottom: 'var(--space-4)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span className="input-label">
-                  {activeTab === 'stake' ? 'Amount to Stake (TON)' : 'Amount to Unstake (tsTON)'}
+            {/* ── Unstake Mode Selector (only visible on Unstake tab) ── */}
+            <AnimatePresence>
+              {activeTab === 'unstake' && (
+                <motion.div
+                  key="unstake-modes"
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  style={{ overflow: 'hidden', marginBottom: 'var(--space-4)' }}
+                >
+                  <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
+                    {[
+                      { mode: 'standard' as const, icon: '', label: 'Standard', desc: 'Next round' },
+                      { mode: 'instant' as const, icon: '⚡', label: 'Instant', desc: 'Immediate' },
+                      { mode: 'bestRate' as const, icon: '📈', label: 'Best Rate', desc: 'Optimised' },
+                    ].map((opt) => (
+                      <button
+                        key={opt.mode}
+                        onClick={() => setUnstakeMode(opt.mode)}
+                        className={`earn-mode-btn ${unstakeMode === opt.mode ? 'active' : ''}`}
+                      >
+                        {opt.icon && <span style={{ marginRight: '4px' }}>{opt.icon}</span>}
+                        <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{opt.label}</div>
+                        <div style={{ fontSize: '10px', opacity: 0.6, marginTop: '2px' }}>{opt.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            {/* ── Amount Input ── */}
+            <div className="earn-input-card" style={{ marginBottom: 'var(--space-4)' }}>
+              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginBottom: 'var(--space-3)', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase' }}>
+                Amount ({activeTab === 'stake' ? 'TON' : 'tsTON'})
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
+                {/* Token badge */}
+                <div className="earn-token-badge">
+                  <div className="earn-token-icon">
+                    {activeTab === 'stake' ? '💎' : (
+                      <span style={{ fontSize: '14px', fontWeight: 800, color: '#e8a014' }}>ts</span>
+                    )}
+                  </div>
+                  <span style={{ fontSize: 'var(--text-sm)', fontWeight: 700 }}>
+                    {activeTab === 'stake' ? 'TON' : 'tsTON'}
+                  </span>
+                </div>
+
+                <input
+                  type="number"
+                  className="earn-amount-input"
+                  placeholder="0.00"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  min="0"
+                  step="0.1"
+                />
+              </div>
+
+              {/* Balance row */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--space-3)' }}>
+                <span style={{ fontSize: '11px', color: 'var(--color-text-tertiary)' }}>
+                  {activeTab === 'stake' ? (
+                    <>1 tsTON = {(tonstakers.rates?.tsTONTON || 1).toFixed(4)} TON</>
+                  ) : (
+                    <>1 tsTON = {(tonstakers.rates?.tsTONTON || 1).toFixed(4)} TON</>
+                  )}
                 </span>
                 <button
                   onClick={setMaxAmount}
                   style={{
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--color-primary)',
-                    fontWeight: 600,
+                    fontSize: '11px',
+                    color: 'var(--color-accent)',
+                    fontWeight: 700,
                     cursor: 'pointer',
                     background: 'none',
                     border: 'none',
+                    padding: '2px 6px',
+                    borderRadius: 'var(--radius-sm)',
                   }}
                 >
-                  MAX
+                  {activeTab === 'stake' ? `${availableTon.toFixed(2)} TON` : `${stakedTsTon.toFixed(4)} tsTON`} · MAX
                 </button>
-              </div>
-              <input
-                type="number"
-                className="input input-lg"
-                placeholder="0.00"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value)}
-                min="0"
-                step="0.1"
-              />
-              <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)' }}>
-                Available: {activeTab === 'stake'
-                  ? `${formatTON(tonstakers.availableBalance)} TON`
-                  : `${formatTON(tonstakers.stakedBalance)} tsTON`}
               </div>
             </div>
 
-            {/* Unstake Mode */}
-            {activeTab === 'unstake' && (
-              <div style={{ marginBottom: 'var(--space-4)' }}>
-                <span className="input-label" style={{ marginBottom: 'var(--space-2)', display: 'block' }}>
-                  Unstake Mode
-                </span>
-                <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
-                  {[
-                    { mode: 'standard' as const, label: 'Standard', desc: 'Wait for round end' },
-                    { mode: 'instant' as const, label: 'Instant', desc: 'Immediate (if liquidity)' },
-                    { mode: 'bestRate' as const, label: 'Best Rate', desc: 'Max exchange rate' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.mode}
-                      onClick={() => setUnstakeMode(opt.mode)}
-                      style={{
-                        flex: 1,
-                        padding: 'var(--space-3)',
-                        background: unstakeMode === opt.mode ? 'var(--color-primary-soft)' : 'var(--color-surface)',
-                        border: `1px solid ${unstakeMode === opt.mode ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        borderRadius: 'var(--radius-md)',
-                        cursor: 'pointer',
-                        textAlign: 'center',
-                      }}
-                    >
-                      <div style={{ fontSize: 'var(--text-sm)', fontWeight: 600 }}>{opt.label}</div>
-                      <div style={{ fontSize: '10px', color: 'var(--color-text-tertiary)', marginTop: '2px' }}>{opt.desc}</div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Summary */}
+            {/* ── Summary ── */}
             {amountNum > 0 && (
               <div style={{
                 padding: 'var(--space-4)',
                 background: 'var(--color-surface)',
                 borderRadius: 'var(--radius-md)',
                 marginBottom: 'var(--space-4)',
+                fontSize: 'var(--text-sm)',
               }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                   <span style={{ color: 'var(--color-text-secondary)' }}>You {activeTab}</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
                     {amount} {activeTab === 'stake' ? 'TON' : 'tsTON'}
@@ -298,20 +326,20 @@ export const EarnPage: React.FC = () => {
                 </div>
                 {activeTab === 'stake' && (
                   <>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)', marginBottom: 'var(--space-2)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 'var(--space-2)' }}>
                       <span style={{ color: 'var(--color-text-secondary)' }}>You receive (est.)</span>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-accent)' }}>
                         ~{(amountNum / (tonstakers.rates?.tsTONTON || 1.067)).toFixed(4)} tsTON
                       </span>
                     </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                       <span style={{ color: 'var(--color-text-secondary)' }}>Network fee</span>
                       <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>~1 TON</span>
                     </div>
                   </>
                 )}
                 {activeTab === 'unstake' && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: 'var(--color-text-secondary)' }}>You receive (est.)</span>
                     <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-accent)' }}>
                       ~{(amountNum * (tonstakers.rates?.tsTONTON || 1.067)).toFixed(4)} TON
@@ -321,23 +349,18 @@ export const EarnPage: React.FC = () => {
               </div>
             )}
 
-            {/* Action Button */}
+            {/* ── Action Button ── */}
             {sdkInitFailed ? (
-              <button
-                className="btn btn-primary btn-lg btn-full"
-                onClick={retryInit}
-              >
+              <button className="btn btn-primary btn-lg btn-full" onClick={retryInit}>
                 🔄 Retry Connection to Tonstakers
               </button>
             ) : (
               <button
                 className={`btn ${activeTab === 'stake' ? 'btn-accent' : 'btn-primary'} btn-lg btn-full`}
                 onClick={activeTab === 'stake' ? handleStake : handleUnstake}
-                disabled={amountNum <= 0 || processing || !tonstakers.sdkReady}
+                disabled={amountNum <= 0 || processing}
               >
-                {!tonstakers.sdkReady ? (
-                  <><span className="animate-spin">⚡</span> Initializing wallet...</>
-                ) : processing ? (
+                {processing ? (
                   <><span className="animate-spin">⚡</span> Processing...</>
                 ) : activeTab === 'stake' ? (
                   '💎 Stake TON → tsTON'
@@ -361,19 +384,19 @@ export const EarnPage: React.FC = () => {
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
                   <span>1 tsTON</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    {tonstakers.rates?.tsTONTON?.toFixed(4) || '—'} TON
+                    {tonstakers.rates?.tsTONTON?.toFixed(4) || '-'} TON
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
                   <span>1 TON</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600 }}>
-                    ${tonstakers.rates?.TONUSD?.toFixed(2) || '—'}
+                    ${tonstakers.rates?.TONUSD?.toFixed(2) || '-'}
                   </span>
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 'var(--text-sm)' }}>
                   <span>Projected 1 tsTON</span>
                   <span style={{ fontFamily: 'var(--font-mono)', fontWeight: 600, color: 'var(--color-success)' }}>
-                    {tonstakers.rates?.tsTONTONProjected?.toFixed(4) || '—'} TON
+                    {tonstakers.rates?.tsTONTONProjected?.toFixed(4) || '-'} TON
                   </span>
                 </div>
               </div>
@@ -408,10 +431,10 @@ export const EarnPage: React.FC = () => {
                 How It Works
               </h4>
               <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)', fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', lineHeight: 1.7 }}>
-                <div>1️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Stake TON</strong> — Your TON is delegated to validators</div>
-                <div>2️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Receive tsTON</strong> — A liquid token that grows in value</div>
-                <div>3️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Earn Yield</strong> — tsTON/TON rate increases over time</div>
-                <div>4️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Unstake Anytime</strong> — Redeem tsTON for TON + rewards</div>
+                <div>1️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Stake TON</strong> - Your TON is delegated to validators</div>
+                <div>2️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Receive tsTON</strong> - A liquid token that grows in value</div>
+                <div>3️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Earn Yield</strong> - tsTON/TON rate increases over time</div>
+                <div>4️⃣ <strong style={{ color: 'var(--color-text-primary)' }}>Unstake Anytime</strong> - Redeem tsTON for TON + rewards</div>
               </div>
             </GlassCard>
           </div>
@@ -426,6 +449,138 @@ export const EarnPage: React.FC = () => {
       >
         {modal.content}
       </GlassModal>
+
+      <style>{`
+        /* ── Pill Toggle ── */
+        .earn-tab-toggle {
+          display: flex;
+          background: var(--color-surface);
+          border-radius: var(--radius-full);
+          box-shadow: var(--neu-inset);
+          padding: 3px;
+          gap: 2px;
+        }
+
+        .earn-tab-btn {
+          padding: 6px 20px;
+          border-radius: var(--radius-full);
+          border: none;
+          cursor: pointer;
+          font-size: var(--text-sm);
+          font-weight: 600;
+          font-family: var(--font-sans);
+          background: transparent;
+          color: var(--color-text-secondary);
+          transition: all 250ms ease-out;
+          white-space: nowrap;
+        }
+
+        .earn-tab-btn.active {
+          background: var(--color-fg);
+          color: var(--color-bg);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+        }
+
+        /* ── APY badge ── */
+        .earn-apy-badge {
+          display: flex;
+          align-items: center;
+          padding: 6px 14px;
+          background: linear-gradient(135deg, hsl(145, 60%, 22%), hsl(145, 60%, 30%));
+          color: hsl(145, 80%, 65%);
+          border-radius: var(--radius-full);
+          font-size: var(--text-sm);
+          font-weight: 800;
+          font-family: var(--font-mono);
+          border: 1px solid hsl(145, 50%, 35%);
+          letter-spacing: 0.02em;
+        }
+
+        /* ── Unstake mode buttons ── */
+        .earn-mode-btn {
+          flex: 1;
+          padding: var(--space-3);
+          background: var(--color-surface);
+          border: 1px solid var(--color-border);
+          border-radius: var(--radius-md);
+          cursor: pointer;
+          text-align: center;
+          font-family: var(--font-sans);
+          color: var(--color-fg);
+          transition: all 200ms ease-out;
+          box-shadow: var(--neu-inset-sm);
+        }
+
+        .earn-mode-btn.active {
+          background: var(--color-bg);
+          border-color: var(--color-accent);
+          box-shadow: var(--neu-extruded-sm), 0 0 0 1px var(--color-accent);
+          color: var(--color-accent);
+        }
+
+        .earn-mode-btn:hover:not(.active) {
+          background: var(--color-bg);
+          border-color: var(--color-text-tertiary);
+        }
+
+        /* ── Amount input card ── */
+        .earn-input-card {
+          background: var(--color-surface);
+          border-radius: var(--radius-lg);
+          padding: var(--space-4);
+          box-shadow: var(--neu-inset);
+        }
+
+        /* ── Token badge (TON / tsTON) ── */
+        .earn-token-badge {
+          display: flex;
+          align-items: center;
+          gap: var(--space-2);
+          background: var(--color-bg);
+          border-radius: var(--radius-full);
+          padding: var(--space-2) var(--space-3);
+          box-shadow: var(--neu-extruded-sm);
+          white-space: nowrap;
+          min-width: 90px;
+        }
+
+        .earn-token-icon {
+          width: 28px;
+          height: 28px;
+          border-radius: var(--radius-full);
+          background: linear-gradient(135deg, hsl(210, 80%, 55%), hsl(210, 80%, 70%));
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          font-size: 14px;
+          flex-shrink: 0;
+        }
+
+        /* ── Amount input ── */
+        .earn-amount-input {
+          flex: 1;
+          background: transparent;
+          border: none;
+          outline: none;
+          font-size: var(--text-2xl);
+          font-weight: 700;
+          font-family: var(--font-mono);
+          color: var(--color-fg);
+          text-align: right;
+          width: 100%;
+          min-width: 0;
+        }
+
+        .earn-amount-input::placeholder {
+          color: var(--color-text-tertiary);
+        }
+
+        .earn-amount-input::-webkit-outer-spin-button,
+        .earn-amount-input::-webkit-inner-spin-button {
+          -webkit-appearance: none;
+          margin: 0;
+        }
+      `}</style>
     </motion.div>
   );
 };

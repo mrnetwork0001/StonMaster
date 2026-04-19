@@ -25,7 +25,7 @@ const features = [
   {
     icon: '🔗',
     title: 'SocialSwap',
-    desc: 'Build shareable trade strategies with referral links. Followers execute real swaps — you earn fees.',
+    desc: 'Build shareable trade strategies with referral links. Followers execute real swaps - you earn fees.',
   },
 ];
 
@@ -37,7 +37,7 @@ export const LandingPage: React.FC = () => {
       {/* ── Nav ── */}
       <nav className="landing-nav">
         <div className="landing-brand">
-          <div className="landing-logo">⚡</div>
+          <img src="/logo.png" alt="StonMaster" className="landing-logo" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover' }} />
           <span className="landing-logo-text">StonMaster</span>
         </div>
         <button className="landing-nav-btn" onClick={() => navigate('/app')}>
@@ -62,7 +62,7 @@ export const LandingPage: React.FC = () => {
 
             <motion.p className="landing-subtitle" custom={2} variants={fadeUp}>
               Sweep wallet dust, maximize staking yields, and share viral trade
-              strategies — all from one premium dashboard.
+              strategies - all from one premium dashboard.
             </motion.p>
 
             <motion.div className="landing-cta-row" custom={3} variants={fadeUp}>
@@ -156,7 +156,7 @@ export const LandingPage: React.FC = () => {
 
       {/* ── Footer ── */}
       <footer className="landing-footer">
-        <span>© 2025 StonMaster — Built for the STON.fi Hackathon</span>
+        <span>© 2025 StonMaster - Built for the STON.fi Hackathon</span>
         <div className="landing-footer-links">
           <a href="https://ston.fi" target="_blank" rel="noopener noreferrer">STON.fi</a>
           <a href="https://ton.org" target="_blank" rel="noopener noreferrer">TON</a>

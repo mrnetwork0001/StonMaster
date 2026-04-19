@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Shared utility for fetching TON transaction info and polling for new transactions.
  * Used by both EarnPage (stake) and SweepPage (batch sweep) to get tx hashes
  * for "View in Explorer" links.
@@ -17,7 +17,7 @@ function apiHeaders(): Record<string, string> {
 
 export interface TxInfo {
   lt: string;
-  hash: string; // base64url tx hash — used by tonviewer
+  hash: string; // base64url tx hash - used by tonviewer
 }
 
 /** Returns the most recent transaction for a wallet, or null on failure. */

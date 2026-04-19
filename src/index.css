@@ -1,7 +1,7 @@
-@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+﻿@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;0,700;1,400&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
 
 /* ============================
-   DESIGN TOKENS — Neumorphism (Soft UI)
+   DESIGN TOKENS - Neumorphism (Soft UI)
    ============================ */
 :root {
   /* Core Surface */
@@ -83,21 +83,21 @@
   --space-16: 4rem;
   --space-20: 5rem;
 
-  /* Borders — Neumorphic = hyper-rounded, no borders */
+  /* Borders - Neumorphic = hyper-rounded, no borders */
   --radius-sm: 12px;
   --radius-md: 16px;
   --radius-lg: 24px;
   --radius-xl: 32px;
   --radius-full: 9999px;
 
-  /* Shadows — mapped to neu presets */
+  /* Shadows - mapped to neu presets */
   --shadow-sm: var(--neu-extruded-sm);
   --shadow-md: var(--neu-extruded);
   --shadow-lg: var(--neu-extruded-hover);
   --shadow-glow-primary: var(--neu-extruded);
   --shadow-glow-accent: var(--neu-extruded);
 
-  /* Transitions — Smooth, physical */
+  /* Transitions - Smooth, physical */
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --duration-fast: 150ms;
   --duration-normal: 300ms;
@@ -390,7 +390,7 @@ input, select, textarea {
 }
 
 /* ============================
-   BUTTONS — Neumorphic
+   BUTTONS - Neumorphic
    ============================ */
 .btn {
   display: inline-flex;
@@ -532,7 +532,7 @@ input, select, textarea {
 }
 
 /* ============================
-   GAUGE — Neumorphic
+   GAUGE - Neumorphic
    ============================ */
 .gauge-container {
   display: flex;
@@ -1094,12 +1094,12 @@ input, select, textarea {
     padding: var(--space-4);
   }
 
-  /* Dashboard grid — stack vertically */
+  /* Dashboard grid - stack vertically */
   .dashboard-grid--with-gauge {
     grid-template-columns: 1fr;
   }
 
-  /* Page two-col — stack vertically */
+  /* Page two-col - stack vertically */
   .page-two-col,
   .page-two-col--narrow {
     grid-template-columns: 1fr;
@@ -1109,7 +1109,7 @@ input, select, textarea {
     grid-template-columns: repeat(2, 1fr);
   }
 
-  /* Module cards — single column */
+  /* Module cards - single column */
   .module-cards-grid {
     grid-template-columns: 1fr;
     gap: var(--space-4);
@@ -1124,7 +1124,7 @@ input, select, textarea {
     height: 48px;
   }
 
-  /* Stats — 2-column on mobile */
+  /* Stats - 2-column on mobile */
   .stats-grid {
     grid-template-columns: 1fr 1fr;
     gap: var(--space-3);
@@ -1138,7 +1138,7 @@ input, select, textarea {
     font-size: var(--text-xl);
   }
 
-  /* Gauge — smaller on mobile */
+  /* Gauge - smaller on mobile */
   .gauge-ring {
     width: 160px;
     height: 160px;

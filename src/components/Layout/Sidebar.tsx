@@ -32,7 +32,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
       )}
       <aside className={`sidebar ${isOpen ? 'open' : ''}`}>
         <Link to="/" className="sidebar-brand" style={{ textDecoration: 'none', color: 'inherit' }}>
-          <div className="sidebar-brand-icon">⚡</div>
+          <img src="/logo.png" alt="StonMaster" style={{ width: 36, height: 36, borderRadius: 8, objectFit: 'cover', flexShrink: 0 }} />
           <div>
             <div className="sidebar-brand-text">StonMaster</div>
             <div className="sidebar-brand-badge">Mission Control</div>

@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+﻿import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -7,7 +7,7 @@ const hasSupabase = !!(supabaseUrl && supabaseAnonKey &&
   !supabaseUrl.includes('placeholder') && !supabaseAnonKey.includes('placeholder'));
 
 if (!hasSupabase) {
-  console.warn('[Supabase] Credentials not configured — using localStorage fallback for short links.');
+  console.warn('[Supabase] Credentials not configured - using localStorage fallback for short links.');
 }
 
 export const supabase = createClient(
@@ -53,7 +53,7 @@ export async function createShortLink(data: Omit<ShortLink, 'id' | 'created_at'>
   const id = nanoid(5);
 
   if (!hasSupabase) {
-    // localStorage mode — link only works on this browser, but still useful for demo
+    // localStorage mode - link only works on this browser, but still useful for demo
     lsSave({ id, ...data });
     return id;
   }

@@ -7,6 +7,7 @@ import { LoadingSkeleton } from '../common/LoadingSkeleton';
 import { WalletHealthGauge } from './WalletHealthGauge';
 import { ModuleCard } from './ModuleCard';
 import { useJettonBalances } from '../../hooks/useJettonBalances';
+import { useTonBalance } from '../../hooks/useTonBalance';
 import { useTonstakers } from '../../hooks/useTonstakers';
 import { formatTON, formatUSD, formatPercent, nanoToTon } from '../../utils/formatters';
 
@@ -25,14 +26,17 @@ const itemVariants = {
 
 export const Dashboard: React.FC = () => {
   const { address } = useWallet();
-  const { tonBalance, totalDustValue, totalValue, clutterScore, dustJettons, loading } = useJettonBalances();
+  const { totalDustValue, totalValue, clutterScore, dustJettons, loading } = useJettonBalances();
+  // useTonBalance is a dedicated single-call hook — much faster than the combined
+  // useJettonBalances fetch, so the balance renders almost immediately on mount.
+  const { balance: tonBalanceNano, loading: tonLoading } = useTonBalance();
   const tonstakers = useTonstakers();
 
   const tonUsd = useMemo(() => {
-    const balance = Number(tonBalance) || 0;
+    const balance = Number(tonBalanceNano) || 0;
     const rate = tonstakers?.rates?.TONUSD || 3.2;
     return nanoToTon(balance) * rate;
-  }, [tonBalance, tonstakers?.rates?.TONUSD]);
+  }, [tonBalanceNano, tonstakers?.rates?.TONUSD]);
 
   const totalPortfolioUsd = tonUsd + (totalValue || 0);
 
@@ -65,7 +69,7 @@ export const Dashboard: React.FC = () => {
                 margin: '0 auto var(--space-6)',
                 lineHeight: 1.7,
               }}>
-                Your all-in-one TON DeFi command center. Sweep dust tokens, maximize staking yields, and share trading strategies — all from one interface.
+                Your all-in-one TON DeFi command center. Sweep dust tokens, maximize staking yields, and share trading strategies - all from one interface.
               </p>
               <div style={{
                 display: 'inline-flex',
@@ -92,12 +96,12 @@ export const Dashboard: React.FC = () => {
             <div className="stats-grid">
               <div className="stat-item">
                 <span className="stat-label">TON Balance</span>
-                {loading ? (
+                {tonLoading ? (
                   <LoadingSkeleton width="120px" height="28px" />
                 ) : (
                   <span className="stat-value">
                     <AnimatedNumber
-                      value={nanoToTon(Number(tonBalance))}
+                      value={nanoToTon(Number(tonBalanceNano))}
                       format={(v) => formatTON((v * 1e9).toString())}
                     />
                     <span style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)', marginLeft: '4px' }}>
@@ -108,7 +112,7 @@ export const Dashboard: React.FC = () => {
               </div>
               <div className="stat-item">
                 <span className="stat-label">Portfolio Value</span>
-                {loading ? (
+                {tonLoading ? (
                   <LoadingSkeleton width="120px" height="28px" />
                 ) : (
                   <span className="stat-value">

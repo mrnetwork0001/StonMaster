@@ -67,12 +67,39 @@ function getHeaders(): Record<string, string> {
   return {};
 }
 
+const requestCache = new Map<string, { promise: Promise<any>; timestamp: number }>();
+
+/**
+ * Deduplicates identical requests made within a short TTL
+ */
+function withCache<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {
+  const now = Date.now();
+  const cached = requestCache.get(key);
+  if (cached && now - cached.timestamp < ttl) {
+    return cached.promise;
+  }
+  const promise = fetcher().catch((err) => {
+    requestCache.delete(key);
+    throw err;
+  });
+  requestCache.set(key, { promise, timestamp: now });
+  return promise;
+}
+
+/**
+ * Force-invalidates cached entries for an address so the next fetch hits the network.
+ * Call this before a user-initiated manual refresh to bypass the TTL.
+ */
+export function invalidateBalanceCache(address: string): void {
+  requestCache.delete(`jettons-${address}`);
+  requestCache.delete(`ton-${address}`);
+}
+
 /**
  * Fetch jetton balances for a wallet address
  */
 export async function fetchJettonBalances(address: string): Promise<JettonBalance[]> {
-
-  try {
+  return withCache(`jettons-${address}`, 5000, async () => {
     const response = await fetchWithRetry(
       `${TONAPI_BASE_URL}/accounts/${address}/jettons?currencies=usd`,
       { headers: getHeaders() }
@@ -80,34 +107,30 @@ export async function fetchJettonBalances(address: string): Promise<JettonBalanc
     if (!response.ok) throw new Error(`TonAPI error: ${response.status}`);
     const data: JettonBalancesResponse = await response.json();
     return data.balances;
-  } catch (error) {
-    console.error('Failed to fetch jetton balances:', error);
-    return []; // Fallback to empty array
-  }
+  });
 }
 
 /**
  * Fetch TON balance for a wallet address
  */
 export async function fetchTonBalance(address: string): Promise<string> {
-
-  // 1. Try TonAPI first
-  try {
-    const response = await fetchWithRetry(
-      `${TONAPI_BASE_URL}/accounts/${address}`,
-      { headers: getHeaders() }
-    );
-    if (response.ok) {
-      const data: AccountInfo = await response.json();
-      return data.balance;
+  return withCache(`ton-${address}`, 5000, async () => {
+    // 1. Try TonAPI first
+    try {
+      const response = await fetchWithRetry(
+        `${TONAPI_BASE_URL}/accounts/${address}`,
+        { headers: getHeaders() }
+      );
+      if (response.ok) {
+        const data: AccountInfo = await response.json();
+        return data.balance;
+      }
+      console.warn(`TonAPI failed (${response.status}), trying Toncenter fallback...`);
+    } catch (error) {
+      console.warn('TonAPI request failed, trying Toncenter fallback:', error);
     }
-    console.warn(`TonAPI failed (${response.status}), trying Toncenter fallback...`);
-  } catch (error) {
-    console.warn('TonAPI request failed, trying Toncenter fallback:', error);
-  }
 
-  // 2. Fallback to Toncenter
-  try {
+    // 2. Fallback to Toncenter
     const response = await fetch(
       `${TONCENTER_API_URL}/jsonRPC`,
       {
@@ -123,14 +146,12 @@ export async function fetchTonBalance(address: string): Promise<string> {
     );
     if (!response.ok) throw new Error(`Toncenter error: ${response.status}`);
     const data = await response.json();
-    if (data.result) {
-      return data.result.balance || '0';
+    if (data.result && data.result.balance !== undefined) {
+      return data.result.balance;
     }
-  } catch (error) {
-    console.error('All balance fetchers failed:', error);
-  }
-
-  return '0';
+    
+    throw new Error('All balance fetchers failed to retrieve balance');
+  });
 }
 
 /**

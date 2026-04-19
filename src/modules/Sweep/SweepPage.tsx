@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTonConnectUI } from '@tonconnect/ui-react';
 import { GlassCard } from '../../components/common/GlassCard';
 import { LoadingSkeleton } from '../../components/common/LoadingSkeleton';
+import { TokenIcon } from '../../components/common/TokenIcon';
 import { useJettonBalances } from '../../hooks/useJettonBalances';
 import type { JettonWithValue } from '../../hooks/useJettonBalances';
 import { formatJettonAmount, formatUSD } from '../../utils/formatters';
@@ -61,7 +62,7 @@ export const SweepPage: React.FC = () => {
   const { address } = useWallet();
   const [tonConnectUI] = useTonConnectUI();
   const omniston = useOmniston();
-  const { jettons, dustJettons, totalDustValue, loading, refresh } = useJettonBalances();
+  const { jettons, dustJettons, totalDustValue, loading, refresh, forceRefresh } = useJettonBalances();
 
   const [selected, setSelected]         = useState<Set<string>>(new Set());
   const [sweepStatus, setSweepStatus]   = useState<SweepStatus>('idle');
@@ -129,7 +130,7 @@ export const SweepPage: React.FC = () => {
         next: (event: any) => {
           if (event.type === 'quoteUpdated') {
             sub.unsubscribe();
-            resolve(event.quote); // event = { type, quote } — pass the quote object directly
+            resolve(event.quote); // event = { type, quote } - pass the quote object directly
           }
         },
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -153,7 +154,7 @@ export const SweepPage: React.FC = () => {
       excessAddress:        { blockchain: Blockchain.TON, address: addr },
       useRecommendedSlippage: true, // required by Omniston SDK
     });
-    if (!tx?.ton?.messages?.length) throw new Error('No messages returned — token may not be swappable');
+    if (!tx?.ton?.messages?.length) throw new Error('No messages returned - token may not be swappable');
     const msg = tx.ton.messages[0];
     return { address: msg.targetAddress, amount: msg.sendAmount, payload: msg.payload };
   }, [omniston]);
@@ -246,7 +247,7 @@ export const SweepPage: React.FC = () => {
           })),
         });
 
-        // ── Phase 4: Poll for on-chain confirmation + capture tx hash ─────
+        // ── Phase 4: Poll for onchain confirmation + capture tx hash ─────
         setSweepStatus('confirming');
         setStatusMessage(`Confirming on TON blockchain${batchLabel}…`);
         batch.forEach(({ idx }) => updateStep(idx, { status: 'confirming' }));
@@ -258,8 +259,8 @@ export const SweepPage: React.FC = () => {
           if (confirmedTx) {
             updateStep(idx, { status: 'done' });
           } else {
-            // tx was submitted but we timed out waiting — mark done with note
-            updateStep(idx, { status: 'done', error: 'Submitted (confirmation timed out — check wallet)' });
+            // tx was submitted but we timed out waiting - mark done with note
+            updateStep(idx, { status: 'done', error: 'Submitted (confirmation timed out - check wallet)' });
           }
           successIdxs.push(idx);
         });
@@ -302,7 +303,7 @@ export const SweepPage: React.FC = () => {
                 Sent in {batchCount} batches (wallet limit: {BATCH_SIZE} tokens per transaction)
               </div>
             )}
-            {/* Explorer links — one per successful batch */}
+            {/* Explorer links - one per successful batch */}
             {batchTxHashes.some(h => h !== null) && (
               <div style={{ marginTop: 'var(--space-3)', display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
                 {batchTxHashes.map((hash, i) =>
@@ -361,7 +362,7 @@ export const SweepPage: React.FC = () => {
               </p>
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-              <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; refresh(); }} disabled={loading || isBusy}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; forceRefresh(); }} disabled={loading || isBusy}>
                 {loading ? '⏳' : '🔄'} Refresh
               </button>
               <button className="btn btn-ghost btn-sm" onClick={selectAllDust} disabled={isBusy}>Select Dust</button>
@@ -398,7 +399,11 @@ export const SweepPage: React.FC = () => {
                       <div className={`jetton-checkbox ${selected.has(jetton.jetton.address) ? 'checked' : ''}`}>
                         {selected.has(jetton.jetton.address) && '✓'}
                       </div>
-                      <div className="jetton-icon">{jetton.jetton.symbol?.slice(0, 2) || '??'}</div>
+                      <TokenIcon
+                        src={jetton.jetton.image}
+                        symbol={jetton.jetton.symbol}
+                        size={36}
+                      />
                       <div className="jetton-info">
                         <div className="jetton-name">{jetton.jetton.name}</div>
                         <div className="jetton-symbol">{jetton.jetton.symbol}</div>
