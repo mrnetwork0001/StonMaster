@@ -18,39 +18,39 @@ Built natively on STON.fi Omniston for the TON ecosystem.
 
 ---
 
-## 🎯 One-Liner
+## One-Liner
 
-> **StonMaster turns your TON wallet into a high-performance DeFi workstation** — scan and sweep dust tokens, earn liquid staking yields, and share trade strategies that followers can execute with one tap.
+> **StonMaster turns your TON wallet into a high-performance DeFi workstation** - scan and sweep dust tokens, earn liquid staking yields, and share trade strategies that followers can execute with one tap.
 
 ---
 
-## 📖 Short Description
+## Short Description
 
 Most TON wallet holders face three silent problems:
 
-1. **Wallet clutter** — small "dust" token balances accumulate but cost more gas to sell than they're worth
-2. **Idle capital** — TON sitting in wallets earns nothing when it could be liquid-staked
-3. **Strategy silos** — profitable trade ideas live in heads or Telegram chats, never executed by others
+1. **Wallet clutter** - small "dust" token balances accumulate but cost more gas to sell than they're worth
+2. **Idle capital** - TON sitting in wallets earns nothing when it could be liquid-staked
+3. **Strategy silos** - profitable trade ideas live in heads or Telegram chats, never executed by others
 
-StonMaster solves all three in one unified, premium-quality dashboard. It is the first **utility hub** built on top of the STON.fi Omniston protocol — combining autonomous dust sweeping, one-click liquid staking, and viral on-chain strategy sharing into a single, production-ready web application.
+StonMaster solves all three in one unified, premium-quality dashboard. It is the first **utility hub** built on top of the STON.fi Omniston protocol - combining autonomous dust sweeping, one-click liquid staking, and viral onchain strategy sharing into a single, production-ready web application.
 
 ---
 
-## ✨ Core Modules
+## Core Modules
 
-### 🧹 StonSweep — Wallet Dust Cleaner
+### StonSweep - Wallet Dust Cleaner
 Automatically scans your wallet for low-value ("dust") token balances. Batches them into a single multi-swap transaction routed through **Omniston** for the best available price, converting everything back to native TON. No manual searching, no guesswork.
 
 **Key features:**
 - Real-time dust detection with USD value thresholds
 - Auto-selection of all dust tokens on load
-- Per-token step progress (quoting → building → signing → confirming)
+- Per-token step progress (quoting - building - signing - confirming)
 - Multi-batch support for wallets with 10+ dust tokens
 - Force-refresh with cache-busting to always show current balances
 - TonViewer explorer link per batch transaction
 
-### 💎 Yield Maximizer — Liquid Staking
-One-click TON staking through the **Tonstakers** protocol. Receive liquid `tsTON` tokens that grow in value as staking rewards accumulate — no lock-up, no waiting.
+### Yield Maximizer - Liquid Staking
+One-click TON staking through the **Tonstakers** protocol. Receive liquid `tsTON` tokens that grow in value as staking rewards accumulate - no lock-up, no waiting.
 
 **Key features:**
 - Live APY, TVL, active staker count from Tonstakers API
@@ -59,17 +59,17 @@ One-click TON staking through the **Tonstakers** protocol. Receive liquid `tsTON
 - Real exchange rate: `1 tsTON = X TON` shown before confirmation
 - Post-transaction explorer links
 
-### 🔗 SocialSwap — Viral Trade Strategies  
+### SocialSwap - Viral Trade Strategies
 Create a trade strategy (token pair + amount), generate a short shareable link powered by **Supabase**, and let followers execute the exact same swap with one tap. A first-of-its-kind social trading layer on TON.
 
 **Key features:**
 - Any-to-any token swap strategy creation
 - Short link generation with persistent Supabase storage
 - Followers see live-quoted estimated output before execution
-- Unverified token warnings with on-chain verification status
+- Unverified token warnings with onchain verification status
 - Copy-to-clipboard + Telegram share integration
 
-### ⚡ Advanced Swap — Pro Swap Interface
+### Advanced Swap - Pro Swap Interface
 A full-featured swap card powered directly by the Omniston SDK. Real-time quote streaming, adjustable slippage, wallet balance display for both "you pay" and "you receive" tokens, and automatic surfacing of all wallet-held tokens.
 
 **Key features:**
@@ -79,22 +79,22 @@ A full-featured swap card powered directly by the Omniston SDK. Real-time quote 
 - Balance loading skeletons (no phantom `0.00` flash on mount)
 - Slippage customization (0.5% / 1% / 3% / custom)
 - Expandable quote details: min received, exchange rate, route
-- Background transaction polling → TonViewer link appears automatically
+- Background transaction polling - TonViewer link appears automatically
 
 ---
 
-## 🤖 AI Tools Used
+## AI Tools Used
 
 | Tool | Role |
 |---|---|
 | **Antigravity (Google DeepMind)** | Full-stack code generation, architecture design, bug resolution, performance optimization, and iterative UX refinement throughout the entire build |
 | **Omniston AI Routing** | STON.fi's AI-powered liquidity routing engine that finds the best swap path across all TON DEXes in real-time |
 
-> StonMaster was built with **Antigravity** as the primary AI coding partner — handling everything from initial scaffolding to production-level edge cases, TypeScript strictness, caching strategies, and design system implementation.
+> StonMaster was built with **Antigravity** as the primary AI coding partner - handling everything from initial scaffolding to production-level edge cases, TypeScript strictness, caching strategies, and design system implementation.
 
 ---
 
-## 🔌 Integrations
+## Integrations
 
 | Integration | Purpose |
 |---|---|
@@ -108,7 +108,7 @@ A full-featured swap card powered directly by the Omniston SDK. Real-time quote 
 
 ---
 
-## 🏗️ Technical Architecture
+## Technical Architecture
 
 ```
 StonMaster/
@@ -143,33 +143,33 @@ StonMaster/
 ### Key Engineering Decisions
 
 **Cache Invalidation Strategy**  
-The `tonapi.ts` request cache uses a 5-second TTL to prevent hammering the API. User-initiated refreshes call `invalidateBalanceCache(address)` first, guaranteeing a fresh network hit — fixing the "click refresh 10 times" problem common in TON dApps.
+The `tonapi.ts` request cache uses a 5-second TTL to prevent hammering the API. User-initiated refreshes call `invalidateBalanceCache(address)` first, guaranteeing a fresh network hit - fixing the "click refresh 10 times" problem common in TON dApps.
 
 **Two-Phase Success Modals**  
-After any swap/stake transaction, a success modal appears immediately (great UX). A background `pollForNewTx` loop then finds the transaction hash and updates the modal with a TonViewer link — no blocking the UI.
+After any swap/stake transaction, a success modal appears immediately (great UX). A background `pollForNewTx` loop then finds the transaction hash and updates the modal with a TonViewer link - no blocking the UI.
 
 **SDK Resilience**  
-The Tonstakers SDK can take 5–12 seconds to complete its internal blockchain handshake. StonMaster implements `withSdkRetry` (6 attempts × 2s gaps) so stake/unstake operations succeed even when the SDK initializes slowly.
+The Tonstakers SDK can take 5-12 seconds to complete its internal blockchain handshake. StonMaster implements `withSdkRetry` (6 attempts x 2s gaps) so stake/unstake operations succeed even when the SDK initializes slowly.
 
 **Wallet Token Auto-Population**  
-Both the Advanced Swap and SocialSwap token dropdowns automatically prepend all tokens held in the connected wallet to the "Popular" section — users never have to search for tokens they already own.
+Both the Advanced Swap and SocialSwap token dropdowns automatically prepend all tokens held in the connected wallet to the "Popular" section - users never have to search for tokens they already own.
 
 ---
 
-## 🎨 Design System
+## Design System
 
-StonMaster is built on a custom **neumorphic design system** — a premium soft-UI aesthetic that feels at home in the TON ecosystem.
+StonMaster is built on a custom **neumorphic design system** - a premium soft-UI aesthetic that feels at home in the TON ecosystem.
 
 - **Theme**: Soft light-mode neumorphism with extruded/inset depth shadows
-- **Accent palette**: Teal → Cyan → Indigo gradient (`hsl(165→200)`)
+- **Accent palette**: Teal - Cyan - Indigo gradient (`hsl(165-200)`)
 - **Typography**: Inter (UI) + Outfit (Display headings)
-- **Icons**: Custom `AppIcon` system — 20+ Feather-style SVG icons, zero OS emoji
+- **Icons**: Custom `AppIcon` system - 20+ Feather-style SVG icons, zero OS emoji
 - **Animations**: Framer Motion micro-animations on every state change
 - **Components**: GlassCard, GlassModal, AnimatedNumber, LoadingSkeleton, TokenIcon
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 - Node.js 18+
@@ -220,7 +220,7 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🧪 Tech Stack
+## Tech Stack
 
 | Layer | Technology |
 |---|---|
@@ -238,46 +238,46 @@ Open [http://localhost:5173](http://localhost:5173)
 
 ---
 
-## 🏆 Why StonMaster Should Win
+## Why StonMaster Should Win
 
-### ✅ Real Utility, Not a Demo
-Every module performs actual onchain operations — real swaps, real staking, real transactions. No mock data, no simulated flows.
+### Real Utility, Not a Demo
+Every module performs actual onchain operations - real swaps, real staking, real transactions. No mock data, no simulated flows.
 
-### ✅ Production-Grade Engineering
+### Production-Grade Engineering
 - Zero TypeScript errors across the entire codebase
 - Request caching with user-controlled invalidation
 - Retry logic for flaky blockchain RPC connections
 - Error states and loading skeletons on every async surface
 
-### ✅ Deep STON.fi Integration
-StonMaster is one of the most comprehensive consumer applications built on Omniston — using the SDK for RFQ streaming, transaction building, and settlement across SweepPage, AdvancedSwap, and SocialSwap simultaneously.
+### Deep STON.fi Integration
+StonMaster is one of the most comprehensive consumer applications built on Omniston - using the SDK for RFQ streaming, transaction building, and settlement across SweepPage, AdvancedSwap, and SocialSwap simultaneously.
 
-### ✅ Novel Primitive: SocialSwap
-The strategy-sharing feature is genuinely new to the TON ecosystem. Viral trade links that execute real swaps represent a new distribution channel for DeFi activity — users become liquidity ambassadors.
+### Novel Primitive: SocialSwap
+The strategy-sharing feature is genuinely new to the TON ecosystem. Viral trade links that execute real onchain swaps represent a new distribution channel for DeFi activity - users become liquidity ambassadors.
 
-### ✅ Premium UX at Hackathon Speed
+### Premium UX at Hackathon Speed
 The neumorphic design system, micro-animations, two-phase transaction modals, and zero-emoji icon system result in an application that feels like a funded product, not a weekend hack.
 
-### ✅ Composable Architecture
+### Composable Architecture
 Each module (Sweep, Earn, Share, Swap) is independently functional and can be extracted as a standalone SDK/widget. The shared `useJettonBalances`, `useTonBalance`, and `AppIcon` systems make the codebase extensible.
 
 ---
 
-## 📸 Screenshots
+## Screenshots
 
 > *Connect your wallet at [ston-master.vercel.app](https://ston-master.vercel.app) for the full experience.*
 
 ---
 
-## 📄 License
+## License
 
-MIT © 2025 StonMaster — Built for the STON.fi Hackathon
+MIT 2025 StonMaster - Built for the STON.fi Hackathon
 
 ---
 
 <div align="center">
 
-**Built with ❤️ for the TON ecosystem**
+**Built with love for the TON ecosystem**
 
 [STON.fi](https://ston.fi) · [TON](https://ton.org) · [Omniston Docs](https://docs.ston.fi) · [Tonstakers](https://tonstakers.com)
 
