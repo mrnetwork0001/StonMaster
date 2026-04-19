@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useRef, useCallback } from 'react';
+import { AppIcon } from '../../components/common/AppIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTonConnectUI } from '@tonconnect/ui-react';
 import { GlassCard } from '../../components/common/GlassCard';
@@ -47,13 +48,13 @@ const itemVariants = {
 // ─── Step status icon map ─────────────────────────────────────────────────────
 function StepIcon({ status }: { status: StepStatus }) {
   switch (status) {
-    case 'quoting':    return <span className="animate-spin" style={{ fontSize: '1em' }}>🔍</span>;
-    case 'building':   return <span className="animate-spin" style={{ fontSize: '1em' }}>📦</span>;
-    case 'sending':    return <span className="animate-spin" style={{ fontSize: '1em' }}>✍️</span>;
-    case 'confirming': return <span className="animate-spin" style={{ fontSize: '1em' }}>🔄</span>;
-    case 'done':       return <>✅</>;
-    case 'error':      return <>❌</>;
-    default:           return <>⏳</>;
+    case 'quoting':    return <AppIcon name="search"  size={16} color="var(--color-accent)"  className="animate-spin" />;
+    case 'building':   return <AppIcon name="package" size={16} color="var(--color-accent)"  className="animate-spin" />;
+    case 'sending':    return <AppIcon name="pen"     size={16} color="var(--color-accent)"  className="animate-spin" />;
+    case 'confirming': return <AppIcon name="refresh" size={16} color="var(--color-accent)"  className="animate-spin" />;
+    case 'done':       return <AppIcon name="check-circle" size={16} color="var(--color-success)" />;
+    case 'error':      return <AppIcon name="x-circle"    size={16} color="var(--color-danger)" />;
+    default:           return <AppIcon name="clock"        size={16} color="var(--color-muted)" />;
   }
 }
 
@@ -210,7 +211,7 @@ export const SweepPage: React.FC = () => {
 
     if (readyMessages.length === 0) {
       setSweepStatus('done');
-      setModal({ isOpen: true, title: '❌ No Routes Found', type: 'error',
+      setModal({ isOpen: true, title: 'No Routes Found', type: 'error',
         content: <p>None of the selected tokens could be routed through Omniston. They may have insufficient liquidity on TON DEXes.</p>
       });
       return;
@@ -282,7 +283,7 @@ export const SweepPage: React.FC = () => {
 
     setModal({
       isOpen: true,
-      title: successCount > 0 ? '🧹 Sweep Complete!' : '❌ Sweep Failed',
+      title: successCount > 0 ? 'Sweep Complete' : 'Sweep Failed',
       type: successCount > 0 ? 'success' : 'error',
       content: (
         <div>
@@ -333,7 +334,9 @@ export const SweepPage: React.FC = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <GlassCard>
           <div style={{ textAlign: 'center', padding: 'var(--space-12) 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>🧹</div>
+            <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
+              <AppIcon name="scan" size={52} color="var(--color-accent)" strokeWidth={1.5} />
+            </div>
             <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, marginBottom: 'var(--space-3)' }}>StonSweep</h2>
             <p style={{ color: 'var(--color-text-secondary)', marginBottom: 'var(--space-6)' }}>
               Connect your wallet to scan for dust tokens and sweep them into TON.
@@ -354,8 +357,8 @@ export const SweepPage: React.FC = () => {
         <GlassCard>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 'var(--space-4)' }}>
             <div>
-              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-1)' }}>
-                🧹 Wallet Scanner
+              <h2 style={{ fontSize: 'var(--text-xl)', fontWeight: 700, marginBottom: 'var(--space-1)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+                <AppIcon name="scan" size={20} color="var(--color-accent)" /> Wallet Scanner
               </h2>
               <p style={{ fontSize: 'var(--text-sm)', color: 'var(--color-text-secondary)' }}>
                 {jettons.length} tokens found · {dustJettons.length} dust tokens worth {formatUSD(totalDustValue)}
@@ -363,7 +366,12 @@ export const SweepPage: React.FC = () => {
             </div>
             <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
               <button className="btn btn-ghost btn-sm" onClick={() => { hasAutoSelected.current = false; forceRefresh(); }} disabled={loading || isBusy}>
-                {loading ? '⏳' : '🔄'} Refresh
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  {loading
+                    ? <AppIcon name="loader" size={14} className="animate-spin" />
+                    : <AppIcon name="refresh" size={14} />}
+                  Refresh
+                </span>
               </button>
               <button className="btn btn-ghost btn-sm" onClick={selectAllDust} disabled={isBusy}>Select Dust</button>
               <button className="btn btn-ghost btn-sm" onClick={selectAll} disabled={isBusy}>Select All</button>
@@ -454,7 +462,10 @@ export const SweepPage: React.FC = () => {
                 onClick={startSweep}
                 disabled={selected.size === 0}
               >
-                🧹 Sweep {selected.size} Token{selected.size !== 1 ? 's' : ''} → TON
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <AppIcon name="sweep" size={16} />
+                  Sweep {selected.size} Token{selected.size !== 1 ? 's' : ''} → TON
+                </span>
               </button>
             )}
 
@@ -473,7 +484,7 @@ export const SweepPage: React.FC = () => {
                     textAlign: 'center',
                     fontWeight: 500,
                   }}>
-                    {sweepStatus === 'confirming' && <span className="animate-spin" style={{ marginRight: 4 }}>🔄</span>}
+                    {sweepStatus === 'confirming' && <AppIcon name="refresh" size={14} className="animate-spin" style={{ marginRight: 4 }} />}
                     {statusMessage}
                   </div>
                 )}
@@ -491,7 +502,7 @@ export const SweepPage: React.FC = () => {
                   </div>
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-tertiary)', marginTop: 'var(--space-2)', textAlign: 'center' }}>
                     {sweepStatus === 'done'
-                      ? `✅ ${sweepSteps.filter(s => s.status === 'done').length} of ${sweepSteps.length} swept`
+                      ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon name="check-circle" size={12} color="var(--color-success)" /> {sweepSteps.filter(s => s.status === 'done').length} of {sweepSteps.length} swept</span>
                       : `${sweepSteps.filter(s => s.status === 'done' || s.status === 'error').length} / ${sweepSteps.length} processed`
                     }
                   </div>
@@ -530,7 +541,9 @@ export const SweepPage: React.FC = () => {
                     }}
                     style={{ marginTop: 'var(--space-4)' }}
                   >
-                    🔄 Scan Again
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                      <AppIcon name="scan" size={15} /> Scan Again
+                    </span>
                   </button>
                 )}
               </div>

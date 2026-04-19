@@ -1,4 +1,5 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
+import { AppIcon } from '../../components/common/AppIcon';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useWallet } from '../../hooks/useWallet';
 import { GlassCard } from '../../components/common/GlassCard';
@@ -59,7 +60,7 @@ export const EarnPage: React.FC = () => {
       setAmount('');
       setModal({
         isOpen: true,
-        title: 'Stake Successful! 💎',
+        title: 'Stake Successful',
         type: 'success',
         content: (
           <div>
@@ -100,7 +101,7 @@ export const EarnPage: React.FC = () => {
       setAmount('');
       setModal({
         isOpen: true,
-        title: 'Unstake Initiated! 🔓',
+        title: 'Unstake Initiated',
         type: 'success',
         content: (
           <div>
@@ -148,7 +149,9 @@ export const EarnPage: React.FC = () => {
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
         <GlassCard>
           <div style={{ textAlign: 'center', padding: 'var(--space-12) 0' }}>
-            <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>💎</div>
+            <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
+              <AppIcon name="gem" size={52} color="var(--color-accent)" strokeWidth={1.5} />
+            </div>
             <h2 style={{ fontSize: 'var(--text-2xl)', fontWeight: 700, marginBottom: 'var(--space-3)' }}>
               Yield Maximizer
             </h2>
@@ -235,7 +238,7 @@ export const EarnPage: React.FC = () => {
                   <div style={{ display: 'flex', gap: 'var(--space-2)' }}>
                     {[
                       { mode: 'standard' as const, icon: '', label: 'Standard', desc: 'Next round' },
-                      { mode: 'instant' as const, icon: '⚡', label: 'Instant', desc: 'Immediate' },
+                      { mode: 'instant' as const, icon: 'zap' as const, label: 'Instant', desc: 'Immediate' },
                       { mode: 'bestRate' as const, icon: '📈', label: 'Best Rate', desc: 'Optimised' },
                     ].map((opt) => (
                       <button
@@ -243,7 +246,7 @@ export const EarnPage: React.FC = () => {
                         onClick={() => setUnstakeMode(opt.mode)}
                         className={`earn-mode-btn ${unstakeMode === opt.mode ? 'active' : ''}`}
                       >
-                        {opt.icon && <span style={{ marginRight: '4px' }}>{opt.icon}</span>}
+                        {opt.icon && <span style={{ marginRight: '4px', display: 'inline-flex', alignItems: 'center' }}><AppIcon name={opt.icon} size={13} /></span>}
                         <div style={{ fontWeight: 600, fontSize: 'var(--text-sm)' }}>{opt.label}</div>
                         <div style={{ fontSize: '10px', opacity: 0.6, marginTop: '2px' }}>{opt.desc}</div>
                       </button>
@@ -262,7 +265,9 @@ export const EarnPage: React.FC = () => {
                 {/* Token badge */}
                 <div className="earn-token-badge">
                   <div className="earn-token-icon">
-                    {activeTab === 'stake' ? '💎' : (
+                    {activeTab === 'stake' ? (
+                      <AppIcon name="gem" size={20} color="var(--color-accent)" />
+                    ) : (
                       <span style={{ fontSize: '14px', fontWeight: 800, color: '#e8a014' }}>ts</span>
                     )}
                   </div>
@@ -352,7 +357,9 @@ export const EarnPage: React.FC = () => {
             {/* ── Action Button ── */}
             {sdkInitFailed ? (
               <button className="btn btn-primary btn-lg btn-full" onClick={retryInit}>
-                🔄 Retry Connection to Tonstakers
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  <AppIcon name="refresh" size={16} /> Retry Connection to Tonstakers
+                </span>
               </button>
             ) : (
               <button
@@ -361,11 +368,17 @@ export const EarnPage: React.FC = () => {
                 disabled={amountNum <= 0 || processing}
               >
                 {processing ? (
-                  <><span className="animate-spin">⚡</span> Processing...</>
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <AppIcon name="loader" size={16} className="animate-spin" /> Processing...
+                  </span>
                 ) : activeTab === 'stake' ? (
-                  '💎 Stake TON → tsTON'
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <AppIcon name="gem" size={16} /> Stake TON → tsTON
+                  </span>
                 ) : (
-                  '🔓 Unstake tsTON → TON'
+                  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                    <AppIcon name="arrow-right" size={16} /> Unstake tsTON → TON
+                  </span>
                 )}
               </button>
             )}

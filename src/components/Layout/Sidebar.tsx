@@ -1,12 +1,14 @@
 import React from 'react';
 import { NavLink, Link } from 'react-router-dom';
+import { AppIcon } from '../common/AppIcon';
+import type { IconName } from '../common/AppIcon';
 
-const navItems = [
-  { path: '/app', label: 'Dashboard', icon: '🏠', exact: true },
-  { path: '/sweep', label: 'StonSweep', icon: '🧹', exact: false },
-  { path: '/earn', label: 'Yield Maximizer', icon: '💎', exact: false },
-  { path: '/share', label: 'SocialSwap', icon: '🔗', exact: false },
-  { path: '/swap', label: 'Advanced Swap', icon: '⚡', exact: false },
+const navItems: { path: string; label: string; icon: IconName; exact: boolean }[] = [
+  { path: '/app',   label: 'Dashboard',      icon: 'home',    exact: true  },
+  { path: '/sweep', label: 'StonSweep',       icon: 'sweep',   exact: false },
+  { path: '/earn',  label: 'Yield Maximizer', icon: 'gem',     exact: false },
+  { path: '/share', label: 'SocialSwap',      icon: 'link',    exact: false },
+  { path: '/swap',  label: 'Advanced Swap',   icon: 'zap',     exact: false },
 ];
 
 interface SidebarProps {
@@ -50,7 +52,9 @@ export const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
               }
               onClick={onClose}
             >
-              <span className="sidebar-link-icon">{item.icon}</span>
+              <span className="sidebar-link-icon">
+                <AppIcon name={item.icon} size={17} strokeWidth={2} />
+              </span>
               {item.label}
             </NavLink>
           ))}

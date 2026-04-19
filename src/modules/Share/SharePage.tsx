@@ -114,7 +114,11 @@ export const SharePage: React.FC = () => {
                 <div style={{ fontSize: 'var(--text-sm)', marginBottom: 'var(--space-3)' }}>
                   <strong>Verification:</strong>{' '}
                   <span style={{ color: meta.verification === 'whitelist' ? 'var(--color-accent-secondary)' : 'var(--color-warning)' }}>
-                    {meta.verification === 'whitelist' ? '✅ Verified' : '⚠️ Unverified'}
+                    {meta.verification === 'whitelist' ? (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><AppIcon name="shield-check" size={12} color="var(--color-success)" /> Verified</span>
+                    ) : (
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}><AppIcon name="warning" size={12} color="var(--color-warning, hsl(38,90%,55%))" /> Unverified</span>
+                    )}
                   </span>
                 </div>
                 <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-muted)', fontFamily: 'var(--font-mono)', wordBreak: 'break-all', marginBottom: 'var(--space-3)' }}>
@@ -122,7 +126,10 @@ export const SharePage: React.FC = () => {
                 </div>
                 {meta.verification !== 'whitelist' && (
                   <div style={{ fontSize: 'var(--text-xs)', color: 'var(--color-warning)', padding: 'var(--space-2) var(--space-3)', background: 'var(--color-warning-soft)', borderRadius: 'var(--radius-sm)' }}>
-                    ⚠️ This token is not verified. Trade at your own risk.
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                      <AppIcon name="warning" size={13} color="hsl(38,90%,55%)" />
+                      This token is not verified. Trade at your own risk.
+                    </span>
                   </div>
                 )}
               </div>
@@ -136,7 +143,7 @@ export const SharePage: React.FC = () => {
               setPendingToken(null);
               setModal({
                 isOpen: true,
-                title: 'Token Added ✅',
+                title: 'Token Added',
                 type: 'success',
                 content: `${meta.name} (${meta.symbol}) has been added to your token list.`,
               });
@@ -650,7 +657,7 @@ export const SharePage: React.FC = () => {
                         ? '⏳ Fetching quote...'
                         : estimatedOutput
                           ? `~${estimatedOutput} ${toToken.symbol}`
-                          : '⚠️ Quote unavailable'}
+                          : 'Quote unavailable'}
                     </strong>
                   </div>
                 </div>
@@ -668,7 +675,7 @@ export const SharePage: React.FC = () => {
                 onClick={handleFollowTrade}
                 disabled={isQuoting || creatingLink}
               >
-                {isQuoting ? '⏳ Live Quote...' : '⚡ Follow Strategy'}
+                {isQuoting ? 'Live Quote...' : 'Follow Strategy'}
               </button>
             ) : (
               <button
@@ -676,7 +683,11 @@ export const SharePage: React.FC = () => {
                 onClick={generateLink}
                 disabled={!amount || parseFloat(amount) <= 0 || creatingLink}
               >
-                {creatingLink ? '⏳ Creating ID...' : '🔗 Generate Strategy Link'}
+                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                  {creatingLink
+                    ? <><AppIcon name="loader" size={14} className="animate-spin" /> Creating ID...</>
+                    : <><AppIcon name="link" size={14} /> Generate Strategy Link</>}
+                </span>
               </button>
             )}
             
@@ -706,12 +717,18 @@ export const SharePage: React.FC = () => {
                     <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}>
                       <div className="share-link-box" onClick={copyLink}>
                         <span className="share-link-text">{generatedLink}</span>
-                        <button className="btn btn-ghost btn-sm">{copied ? '✅' : '📋'}</button>
+                        <button className="btn btn-ghost btn-sm" style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                          {copied
+                            ? <AppIcon name="check" size={14} color="var(--color-success)" />
+                            : <AppIcon name="clipboard" size={14} />}
+                        </button>
                       </div>
 
                       <div style={{ display: 'flex', gap: 'var(--space-3)', marginTop: 'var(--space-4)' }}>
                         <button className="btn btn-primary btn-full" onClick={copyLink}>
-                          {copied ? '✅ Copied!' : '📋 Copy Link'}
+                          {copied
+                            ? <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon name="check" size={13} color="var(--color-success)" /> Copied!</span>
+                            : <span style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}><AppIcon name="clipboard" size={13} /> Copy Link</span>}
                         </button>
                         <button className="btn btn-accent btn-full" onClick={shareToTelegram}>
                           📱 Telegram
@@ -749,7 +766,7 @@ export const SharePage: React.FC = () => {
         type={modal.type}
         onConfirm={modal.onConfirm}
         isLoading={creatingLink}
-        confirmLabel={modal.type === 'confirm' ? (pendingToken ? '✅ Add to My List' : 'Confirm Trade') : 'Got it'}
+        confirmLabel={modal.type === 'confirm' ? (pendingToken ? 'Add to My List' : 'Confirm Trade') : 'Got it'}
       >
         {modal.content}
       </GlassModal>

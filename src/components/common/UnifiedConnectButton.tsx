@@ -1,7 +1,9 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import { useTonConnectUI, TonConnectButton } from '@tonconnect/ui-react';
 import { GlassModal } from './GlassModal';
 import { useWallet } from '../../hooks/useWallet';
+import { AppIcon } from './AppIcon';
+
 
 export const UnifiedConnectButton: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
@@ -87,7 +89,7 @@ export const UnifiedConnectButton: React.FC = () => {
                 boxShadow: 'none',
               }}
             >
-              <span>🔌</span> Disconnect
+              <AppIcon name="x" size={13} style={{ marginRight: 4 }} /> Disconnect
             </button>
           </div>
         </GlassModal>

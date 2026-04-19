@@ -6,6 +6,7 @@ import { Address, Cell } from '@ton/core';
 import { GlassCard } from '../../components/common/GlassCard';
 import { GlassModal } from '../../components/common/GlassModal';
 import { TokenIcon } from '../../components/common/TokenIcon';
+import { AppIcon } from '../../components/common/AppIcon';
 import { useWallet } from '../../hooks/useWallet';
 import { useJettonBalances } from '../../hooks/useJettonBalances';
 import { useTonBalance } from '../../hooks/useTonBalance';
@@ -675,12 +676,12 @@ export const AdvancedSwapPage: React.FC = () => {
 
   // Button label/state
   const buttonState = (() => {
-    if (!address) return { label: '🔌 Connect Wallet', disabled: false };
+    if (!address) return { label: 'Connect Wallet', disabled: false };
     if (amountNum <= 0) return { label: 'Enter an Amount', disabled: true };
-    if (isQuoting) return { label: '⏳ Fetching Best Route…', disabled: true };
-    if (!quoteOutput) return { label: '⚠️ No Route Available', disabled: true };
-    if (swapping) return { label: '⚡ Confirm in Wallet…', disabled: true };
-    return { label: `⚡ Swap ${fromToken.symbol} → ${toToken.symbol}`, disabled: false };
+    if (isQuoting) return { label: 'Fetching Best Route…', disabled: true };
+    if (!quoteOutput) return { label: 'No Route Available', disabled: true };
+    if (swapping) return { label: 'Confirm in Wallet…', disabled: true };
+    return { label: `Swap ${fromToken.symbol} → ${toToken.symbol}`, disabled: false };
   })();
 
   return (
@@ -919,7 +920,7 @@ export const AdvancedSwapPage: React.FC = () => {
                 display: 'flex', alignItems: 'center', justifyContent: 'center',
                 fontSize: '1.5rem', boxShadow: 'var(--neu-extruded-sm)',
               }}>
-                🔄
+                <AppIcon name="refresh" size={18} />
               </div>
               <div>
                 <div style={{ fontWeight: 700, fontSize: 'var(--text-base)' }}>Omniston Protocol</div>
@@ -971,7 +972,7 @@ export const AdvancedSwapPage: React.FC = () => {
         type={modal.type}
         onConfirm={modal.onConfirm}
         isLoading={swapping}
-        confirmLabel="⚡ Confirm Swap"
+        confirmLabel="Confirm Swap"
       >
         {modal.content}
       </GlassModal>

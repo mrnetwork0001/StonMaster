@@ -6,6 +6,7 @@ import { AnimatedNumber } from '../common/AnimatedNumber';
 import { LoadingSkeleton } from '../common/LoadingSkeleton';
 import { WalletHealthGauge } from './WalletHealthGauge';
 import { ModuleCard } from './ModuleCard';
+import { AppIcon } from '../common/AppIcon';
 import { useJettonBalances } from '../../hooks/useJettonBalances';
 import { useTonBalance } from '../../hooks/useTonBalance';
 import { useTonstakers } from '../../hooks/useTonstakers';
@@ -51,7 +52,9 @@ export const Dashboard: React.FC = () => {
         <motion.div variants={itemVariants} style={{ marginBottom: 'var(--space-8)' }}>
           <GlassCard>
             <div style={{ textAlign: 'center', padding: 'var(--space-8) 0' }}>
-              <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>⚡</div>
+              <div style={{ fontSize: '3rem', marginBottom: 'var(--space-4)' }}>
+                <AppIcon name="zap" size={52} color="var(--color-accent)" strokeWidth={1.5} />
+              </div>
               <h2 style={{
                 fontSize: 'var(--text-3xl)',
                 fontWeight: 800,
@@ -179,7 +182,7 @@ export const Dashboard: React.FC = () => {
             <ModuleCard
               to="/sweep"
               variant="sweep"
-              icon="🧹"
+              icon={<AppIcon name="sweep" size={20} color="currentColor" />}
               title="StonSweep"
               description="Clean up your wallet by sweeping dust tokens into TON using the best rates from Omniston."
               cta="Start Sweeping"
@@ -189,7 +192,7 @@ export const Dashboard: React.FC = () => {
             <ModuleCard
               to="/earn"
               variant="earn"
-              icon="💎"
+              icon={<AppIcon name="gem" size={20} color="currentColor" />}
               title="Yield Maximizer"
               description="One-click liquid staking through Tonstakers. Earn yield while keeping your TON liquid."
               cta="Start Earning"
@@ -199,7 +202,8 @@ export const Dashboard: React.FC = () => {
             <ModuleCard
               to="/share"
               variant="share"
-              icon="🔗"
+              icon={<AppIcon name="link" size={20} color="currentColor" />}
+
               title="SocialSwap"
               description="Create and share trade strategy links. Let others follow your strategies with one click."
               cta="Create Strategy"

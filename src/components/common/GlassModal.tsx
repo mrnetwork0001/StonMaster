@@ -125,7 +125,7 @@ export const GlassModal: React.FC<GlassModalProps> = ({
               onClick={onConfirm}
               disabled={isLoading}
             >
-              {isLoading ? '⚡ Processing...' : (confirmLabel || 'Confirm')}
+              {isLoading ? 'Processing...' : (confirmLabel || 'Confirm')}
             </button>
           </div>
         )}
