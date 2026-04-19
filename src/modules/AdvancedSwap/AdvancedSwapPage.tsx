@@ -108,15 +108,15 @@ const TokenDropdown: React.FC<TokenDropdownProps> = ({
   const enrichedFavs = useMemo(() =>
     favorites.map(fav => {
       const match = options.find(t => t.address.toLowerCase() === fav.address.toLowerCase());
-      return match?.icon?.startsWith('http') ? { ...fav, icon: match.icon } : fav;
+      return match?.icon?.startsWith('http') || match?.icon?.startsWith('data:image') ? { ...fav, icon: match.icon } : fav;
     }),
   [favorites, options]);
 
   // Also enrich the currently-selected token shown in the trigger button
   const enrichedValue = useMemo(() => {
-    if (value.icon?.startsWith('http')) return value; // already has a real image
+    if (value.icon?.startsWith('http') || value.icon?.startsWith('data:image')) return value; // already has a real image
     const match = options.find(t => t.address.toLowerCase() === value.address.toLowerCase());
-    return match?.icon?.startsWith('http') ? { ...value, icon: match.icon } : value;
+    return match?.icon?.startsWith('http') || match?.icon?.startsWith('data:image') ? { ...value, icon: match.icon } : value;
   }, [value, options]);
 
   const renderToken = (token: Token, key?: string) => (
@@ -125,7 +125,7 @@ const TokenDropdown: React.FC<TokenDropdownProps> = ({
       className={`swap-token-item ${value.address === token.address ? 'active' : ''}`}
       onClick={() => { onChange(token); setOpen(false); setQuery(''); }}
     >
-      {token.icon && token.icon.startsWith('http') ? (
+      {token.icon && (token.icon.startsWith('http') || token.icon.startsWith('data:image')) ? (
         <img src={token.icon} alt={token.symbol}
           style={{ width: 24, height: 24, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
       ) : (
@@ -145,7 +145,7 @@ const TokenDropdown: React.FC<TokenDropdownProps> = ({
     <div ref={ref} style={{ position: 'relative' }}>
       {/* Trigger */}
       <button className="swap-token-btn" onClick={() => setOpen(o => !o)}>
-        {enrichedValue.icon && enrichedValue.icon.startsWith('http') ? (
+        {enrichedValue.icon && (enrichedValue.icon.startsWith('http') || enrichedValue.icon.startsWith('data:image')) ? (
           <img src={enrichedValue.icon} alt={enrichedValue.symbol}
             style={{ width: 22, height: 22, borderRadius: '50%', objectFit: 'cover' }} />
         ) : (

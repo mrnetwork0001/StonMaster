@@ -15,7 +15,7 @@ interface TokenIconProps {
 export const TokenIcon: React.FC<TokenIconProps> = ({ src, symbol = '?', size = 32, style }) => {
   const [errored, setErrored] = useState(false);
 
-  const isUrl = src && src.startsWith('http');
+  const isUrl = src && (src.startsWith('http') || src.startsWith('data:image'));
 
   if (isUrl && !errored) {
     return (
