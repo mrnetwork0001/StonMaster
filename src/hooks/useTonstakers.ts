@@ -13,16 +13,13 @@ const TONSTAKERS_POOL_ADDRESS = 'EQCkWxfyhAkim3g2DjKQQg8T5P4g-Q1-K_jErGcDJZ4i-vq
 const TONAPI_BASE = 'https://tonapi.io/v2';
 
 // ─── Fallback values (kept close to real values as of April 2026) ─────────────
-// These are only used if ALL fetch attempts fail.
-const FALLBACK_APY      = 19.74;
-const FALLBACK_TVL_NANO = 72_000_000 * 1e9;    // ~72M TON in nanoTON
-const FALLBACK_STAKERS  = 126_000;
-const FALLBACK_RATES    = { TONUSD: 3.2, tsTONTON: 1.096, tsTONTONProjected: 1.115 };
-const FALLBACK_LIQ_NANO = 1_656_991 * 1e9;     // from last known instantLiquidity
+const FALLBACK_APY      = 18.70;
+const FALLBACK_TVL_NANO = 72_287_710 * 1e9;
+const FALLBACK_STAKERS  = 126_688;
+const FALLBACK_RATES    = { TONUSD: 1.29, tsTONTON: 1.097, tsTONTONProjected: 1.115 };
+const FALLBACK_LIQ_NANO = 15_957_420_246_917;
 
 // ─── Tonstakers official cache endpoint ─────────────────────────────────────
-// Primary source - single call, no auth needed, matches exactly what
-// the tonstakers.com dashboard displays.
 const TONSTAKERS_CACHE_URL = 'https://api.tonstakers.com/cache/v1/blockchain/staking';
 
 interface TonstakersPoolStats {
@@ -31,10 +28,9 @@ interface TonstakersPoolStats {
   stakersCount: number;
   tsTONTON: number;
   instantLiquidityNano: number;
-  TONUSD: number; // extracted from Tonstakers' own rates map
+  TONUSD: number;
 }
 
-// zero-address key = TON in the Tonstakers rates map
 const TON_ZERO_ADDRESS = '0:0000000000000000000000000000000000000000000000000000000000000000';
 
 async function fetchPoolStatsFromTonstakers(): Promise<TonstakersPoolStats> {
@@ -44,8 +40,6 @@ async function fetchPoolStatsFromTonstakers(): Promise<TonstakersPoolStats> {
   const d = json.data?.staking_data;
   if (!d) throw new Error('Tonstakers cache: missing staking_data');
 
-  // Extract TON/USD from the Tonstakers rates map - this is the same price
-  // the Tonstakers dashboard uses, ensuring our TVL USD value matches.
   const rates = json.data?.rates ?? {};
   const TONUSD = Number(rates[TON_ZERO_ADDRESS] ?? FALLBACK_RATES.TONUSD);
 
@@ -53,14 +47,12 @@ async function fetchPoolStatsFromTonstakers(): Promise<TonstakersPoolStats> {
     apy:                  Number(d.currentApy),
     tvlNano:              Number(d.tvl),
     stakersCount:         Number(d.stakers),
-    tsTONTON:             Number(d.tsTONPrice),   // tsTON/TON ratio
+    tsTONTON:             Number(d.tsTONPrice),
     instantLiquidityNano: Number(d.instantLiquidity),
     TONUSD,
   };
 }
 
-// ─── TonAPI pool stats (fallback) ────────────────────────────────────────────
-// Used only if the Tonstakers endpoint is unavailable.
 async function fetchPoolStatsFromTonApi(): Promise<TonstakersPoolStats> {
   const headers: Record<string, string> = { 'Content-type': 'application/json' };
   const isMockKey = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
@@ -71,7 +63,6 @@ async function fetchPoolStatsFromTonApi(): Promise<TonstakersPoolStats> {
   const data = await res.json();
   const pool = data.pool;
 
-  // Fetch TON/USD alongside pool data
   let TONUSD = FALLBACK_RATES.TONUSD;
   try {
     const rr = await fetch(`${TONAPI_BASE}/rates?tokens=ton&currencies=usd`, { headers });
@@ -91,17 +82,17 @@ async function fetchPoolStatsFromTonApi(): Promise<TonstakersPoolStats> {
 
 interface TonstakersState {
   sdkReady: boolean;
-  sdkInitFailed: boolean;  // true after all retry attempts exhausted
+  sdkInitFailed: boolean;
   apy: number;
-  tvl: string;             // nanoTON string - consumed by nanoToTon() in EarnPage
+  tvl: string;
   stakersCount: number;
-  stakedBalance: string;   // tsTON jetton balance in nanoTON (from TonAPI, not SDK)
+  stakedBalance: string;
   rates: {
     TONUSD: number;
     tsTONTON: number;
     tsTONTONProjected: number;
   };
-  instantLiquidity: string; // nanoTON string
+  instantLiquidity: string;
   loading: boolean;
   error: string | null;
 }
@@ -110,38 +101,29 @@ export function useTonstakers() {
   const [tonConnectUI] = useTonConnectUI();
   const { address } = useWallet();
 
-  // Real wallet TON balance from TonAPI - displayed as "Available" on the stake page
   const { balance: walletBalanceNano, refresh: refreshBalance } = useTonBalance();
 
   const sdkRef        = useRef<Tonstakers | null>(null);
   const sdkReadyRef   = useRef<boolean>(false);
-  const refreshingRef = useRef<boolean>(false); // deduplicate concurrent refresh() calls
-  // retryCount is incremented by retryInit() to force SDK re-instantiation
+  const refreshingRef = useRef<boolean>(false);
   const [retryCount, setRetryCount] = useState(0);
 
   const [state, setState] = useState<TonstakersState>({
     sdkReady: false,
     sdkInitFailed: false,
-    // Pre-populate with fallback values so the UI never shows 0 while fetching
     apy:              FALLBACK_APY,
     tvl:              String(FALLBACK_TVL_NANO),
     stakersCount:     FALLBACK_STAKERS,
     stakedBalance:    '0',
-    rates:            { ...FALLBACK_RATES },   // includes TONUSD - prevents $0 portfolio flash
+    rates:            { ...FALLBACK_RATES },
     instantLiquidity: String(FALLBACK_LIQ_NANO),
-    loading:          true,   // true only until the first real fetch completes
+    loading:          true,
     error:            null,
   });
 
-  // Tracks whether at least one successful fetch has completed.
-  // After hasLoaded=true, subsequent refreshes won't set loading:true,
-  // so the UI shows stale-but-correct data instead of flickering to 0.
   const hasLoadedRef = useRef(false);
 
-  // ─── Fetch real tsTON jetton balance directly from TonAPI ─────────────────
-  // More reliable than SDK.getStakedBalance() which requires internal SDK setup.
-  // TonAPI returns jetton.address in raw hex form (0:xxx...) while TSTON_ADDRESS
-  // is stored in user-friendly EQ form - normalize both with @ton/core before comparing.
+  // ─── Fetch tsTON jetton balance ──────────────────────────────────────────
   const fetchTstonBalance = useCallback(async (): Promise<string> => {
     if (!address) return '0';
     try {
@@ -153,9 +135,8 @@ export function useTonstakers() {
       const jettons = await fetchJettonBalances(address);
       const tston = jettons.find(j =>
         normalize(j.jetton.address) === tstonRaw ||
-        j.jetton.symbol?.toLowerCase() === 'tston'  // fallback: match by symbol
+        j.jetton.symbol?.toLowerCase() === 'tston'
       );
-      console.log('[tsTON] Found:', tston?.balance, 'from', jettons.length, 'jettons');
       return tston?.balance ?? '0';
     } catch (e) {
       console.warn('[tsTON] fetchTstonBalance failed:', e);
@@ -163,45 +144,29 @@ export function useTonstakers() {
     }
   }, [address]);
 
-  // ─── Fetch global pool stats - primary: Tonstakers cache, fallback: TonAPI ──
-  // A single call to Tonstakers returns APY, TVL, stakers, tsTONPrice, and
-  // instantLiquidity - no SDK or wallet needed. Matches the official dashboard.
+  // ─── Fetch pool stats ────────────────────────────────────────────────────
   const refreshStats = useCallback(async () => {
     if (refreshingRef.current) return;
     refreshingRef.current = true;
-    // Only show the loading skeleton on the very first fetch.
-    // Subsequent background refreshes keep existing values visible.
     if (!hasLoadedRef.current) {
       setState(prev => ({ ...prev, loading: true }));
     }
 
     try {
       const [poolStats, tstonBalanceNano] = await Promise.all([
-        // Primary: official Tonstakers cache - includes TONUSD from their own rates map
-        // Fallback chain: TonAPI (with its own price fetch) → hardcoded constants
         fetchPoolStatsFromTonstakers().catch(async (e) => {
-          console.warn('[Tonstakers] Primary endpoint failed, trying TonAPI fallback:', e);
-          return fetchPoolStatsFromTonApi().catch((e2) => {
-            console.warn('[Tonstakers] TonAPI fallback also failed, using constants:', e2);
-            return {
-              apy:                  FALLBACK_APY,
-              tvlNano:              FALLBACK_TVL_NANO,
-              stakersCount:         FALLBACK_STAKERS,
-              tsTONTON:             FALLBACK_RATES.tsTONTON,
-              instantLiquidityNano: FALLBACK_LIQ_NANO,
-              TONUSD:               FALLBACK_RATES.TONUSD,
-            };
-          });
+          console.warn('[Tonstakers] Primary endpoint failed:', e);
+          return fetchPoolStatsFromTonApi().catch(() => ({
+            apy:                  FALLBACK_APY,
+            tvlNano:              FALLBACK_TVL_NANO,
+            stakersCount:         FALLBACK_STAKERS,
+            tsTONTON:             FALLBACK_RATES.tsTONTON,
+            instantLiquidityNano: FALLBACK_LIQ_NANO,
+            TONUSD:               FALLBACK_RATES.TONUSD,
+          }));
         }),
         fetchTstonBalance(),
       ]);
-
-      console.log(
-        '[Tonstakers] Live stats → APY:', poolStats.apy.toFixed(2) + '%',
-        '| TVL:', (poolStats.tvlNano / 1e9).toFixed(0), 'TON',
-        '| TON/USD:', poolStats.TONUSD.toFixed(4),
-        '| tsTON/TON:', poolStats.tsTONTON.toFixed(4),
-      );
 
       setState(prev => ({
         ...prev,
@@ -220,7 +185,6 @@ export function useTonstakers() {
       }));
       hasLoadedRef.current = true;
 
-
     } catch (err) {
       console.error('[Tonstakers] refreshStats error:', err);
       setState(prev => ({
@@ -233,11 +197,8 @@ export function useTonstakers() {
     }
   }, [fetchTstonBalance]);
 
-
-  /** Alias kept for compatibility - now delegates to refreshStats */
   const refresh = refreshStats;
 
-  /** Call this from the UI to force a fresh SDK instantiation after a failed init. */
   const retryInit = useCallback(() => {
     console.log('[Tonstakers] Manual retry triggered');
     setState(prev => ({ ...prev, sdkInitFailed: false, sdkReady: false }));
@@ -245,30 +206,24 @@ export function useTonstakers() {
     setRetryCount(c => c + 1);
   }, []);
 
-  // ─── Pool stats - fetched directly from TonAPI, no SDK needed ───────────────
-  // Runs immediately on mount and every 90s. Provides APY, TVL, stakers count.
+  // ─── Pool stats fetch on mount and every 90s ─────────────────────────────
   useEffect(() => {
     let destroyed = false;
     refreshStats();
     const interval = setInterval(() => {
       if (!destroyed) refreshStats();
     }, 90_000);
-    return () => {
-      destroyed = true;
-      clearInterval(interval);
-    };
+    return () => { destroyed = true; clearInterval(interval); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [address]); // re-run when wallet address changes to update tsTON balance
+  }, [address]);
 
-  // ─── SDK lifecycle (wallet-dependent, needed only for transactions) ──────────
-  // re-runs on retryCount change so retryInit() forces a fresh instance
+  // ─── SDK lifecycle ────────────────────────────────────────────────────────
   useEffect(() => {
     if (!tonConnectUI) return;
 
-    // Reset failure state for this attempt
     setState(prev => ({ ...prev, sdkInitFailed: false }));
+    console.log(`[Tonstakers] Creating SDK instance (attempt ${retryCount + 1})`);
 
-    console.log(`[Tonstakers] Creating SDK instance… (attempt ${retryCount + 1})`);
     const isMockKey = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
     const sdk = new Tonstakers({
       connector: tonConnectUI,
@@ -277,17 +232,17 @@ export function useTonstakers() {
     });
 
     sdkRef.current = sdk;
+    let destroyed = false;
 
     const onInit = () => {
-      console.log('[Tonstakers] initialized ✅');
+      if (destroyed) return;
+      console.log('[Tonstakers] SDK initialized');
       sdkReadyRef.current = true;
       setState(prev => ({ ...prev, sdkReady: true, sdkInitFailed: false }));
-      // Refresh balance now that SDK+wallet are ready
       refreshStats();
     };
 
     const onDeinit = () => {
-      console.log('[Tonstakers] deinitialized');
       sdkReadyRef.current = false;
       setState(prev => ({ ...prev, sdkReady: false }));
     };
@@ -295,111 +250,120 @@ export function useTonstakers() {
     sdk.addEventListener('initialized', onInit);
     sdk.addEventListener('deinitialized', onDeinit);
 
-    // ── Ready-poll with auto-retry ─────────────────────────────────────────
-    // The SDK only fires 'initialized' when the wallet status *changes*.
-    // If the wallet is already connected, the event won't fire, so we poll.
-    const POLL_INTERVAL_MS = 300;
-    const POLL_TIMEOUT_MS  = 8_000;   // wait 8 s per attempt
-    const MAX_AUTO_RETRIES = 3;
-    let pollElapsed = 0;
-    let destroyed = false;
+    // ── Aggressive polling: check sdk.ready every 500ms for up to 20s ─────
+    // This handles the case where wallet is already connected on mount
+    // (the 'initialized' event won't fire for already-connected wallets).
+    const POLL_MS = 500;
+    const TIMEOUT_MS = 20_000;
+    let elapsed = 0;
 
-    const pollTimer = setInterval(() => {
-      if (destroyed || sdkReadyRef.current) {
-        clearInterval(pollTimer);
-        return;
-      }
-      if (sdk.ready) {
-        console.log('[Tonstakers] sdk.ready detected via poll ✅');
-        clearInterval(pollTimer);
+    const poll = setInterval(() => {
+      if (destroyed || sdkReadyRef.current) { clearInterval(poll); return; }
+      // Check sdk.ready
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      if ((sdk as any).ready === true || sdk.ready === true) {
+        clearInterval(poll);
         onInit();
         return;
       }
-      pollElapsed += POLL_INTERVAL_MS;
-      if (pollElapsed >= POLL_TIMEOUT_MS) {
-        clearInterval(pollTimer);
-        if (retryCount < MAX_AUTO_RETRIES) {
-          console.warn(`[Tonstakers] SDK timeout - auto-retry ${retryCount + 1}/${MAX_AUTO_RETRIES}`);
-          setTimeout(() => {
-            if (!destroyed) setRetryCount(c => c + 1);
-          }, 1_000);
-        } else {
-          console.error('[Tonstakers] All SDK retries exhausted - showing Retry button');
-          // Stats already loaded - just mark SDK init failed so stake button
-          // shows the retry instead of an infinite loader
-          setState(prev => ({ ...prev, sdkInitFailed: true, loading: false }));
+      elapsed += POLL_MS;
+      if (elapsed >= TIMEOUT_MS) {
+        clearInterval(poll);
+        if (!destroyed && !sdkReadyRef.current) {
+          if (retryCount < 5) {
+            console.warn(`[Tonstakers] SDK not ready after ${TIMEOUT_MS / 1000}s - auto-retry ${retryCount + 1}`);
+            setTimeout(() => { if (!destroyed) setRetryCount(c => c + 1); }, 500);
+          } else {
+            console.error('[Tonstakers] SDK exhausted retries - showing retry button');
+            setState(prev => ({ ...prev, sdkInitFailed: true, loading: false }));
+          }
         }
       }
-    }, POLL_INTERVAL_MS);
+    }, POLL_MS);
 
     return () => {
       destroyed = true;
-      clearInterval(pollTimer);
+      clearInterval(poll);
       sdk.removeEventListener('initialized', onInit);
       sdk.removeEventListener('deinitialized', onDeinit);
       sdkReadyRef.current = false;
-      sdkRef.current = null;
+      // Keep sdkRef.current so withSdkRetry can detect it changing
+      if (sdkRef.current === sdk) sdkRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tonConnectUI, retryCount]);
 
-  // Re-fetch personal balance when wallet connects / disconnects.
   useEffect(() => {
     refreshBalance();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
-  // ─── Transaction helpers ────────────────────────────────────────────────────
+  // ─── Transaction helpers ─────────────────────────────────────────────────
 
-  /** Wait up to 10s for the SDK instance to exist (set almost immediately on mount).
-   *  Does NOT wait for sdk.ready — that check is done via withSdkRetry retries. */
-  const waitForSdk = (): Promise<Tonstakers | undefined> => {
-    return new Promise((resolve) => {
-      // Instance is normally set synchronously during the useEffect — resolve right away.
-      const sdk = sdkRef.current;
-      if (sdk) return resolve(sdk);
-      const deadline = Date.now() + 10_000;
-      const id = setInterval(() => {
-        const s = sdkRef.current;
-        if (s) { clearInterval(id); resolve(s); }
-        else if (Date.now() >= deadline) { clearInterval(id); resolve(undefined); }
-      }, 150);
-    });
-  };
-
-  /** Returns true if an error is the SDK's own internal "not ready" error. */
-  const isSdkNotReady = (err: unknown) => {
+  /** Returns true if error is SDK's "not ready" sentinel. */
+  const isSdkNotReady = (err: unknown): boolean => {
     if (!(err instanceof Error)) return false;
     const msg = err.message.toLowerCase();
-    return msg.includes('not fully initialized') || msg.includes('not initialized') || msg.includes('not ready');
+    return msg.includes('not fully initialized') ||
+           msg.includes('not initialized') ||
+           msg.includes('not ready');
   };
 
-  /** Generic retry wrapper — retries up to 6 times on SDK-not-ready errors, 2s apart.
-   *  Gives the SDK up to 12 seconds to finish its internal initialization. */
+  /**
+   * Reliable retry wrapper.
+   * - Always reads the CURRENT sdkRef (handles SDK recreation across retries)
+   * - Waits for sdk.ready before executing fn
+   * - Total timeout: 40 seconds
+   */
   async function withSdkRetry<T>(fn: (sdk: Tonstakers) => Promise<T>): Promise<T> {
-    const sdk = await waitForSdk();
-    if (!sdk) throw new Error('Tonstakers SDK not initialized. Please refresh the page and try again.');
+    const deadline = Date.now() + 40_000;
     let lastErr: unknown;
-    for (let attempt = 0; attempt < 6; attempt++) {
+
+    while (Date.now() < deadline) {
+      const sdk = sdkRef.current;
+
+      // SDK not created yet - wait for it
+      if (!sdk) {
+        await new Promise(r => setTimeout(r, 800));
+        continue;
+      }
+
+      // SDK exists - check if ready
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const isReady = sdkReadyRef.current || (sdk as any).ready === true || sdk.ready === true;
+
+      if (!isReady) {
+        // Not ready yet - keep waiting
+        await new Promise(r => setTimeout(r, 1_000));
+        continue;
+      }
+
+      // SDK ready - attempt the transaction
       try {
         return await fn(sdk);
       } catch (err) {
         if (isSdkNotReady(err)) {
+          // Race condition: SDK reported ready but internal check disagrees
           lastErr = err;
-          console.warn(`[Tonstakers] SDK not ready (attempt ${attempt + 1}/6): ${(err as Error).message} — retrying in 2s`);
+          sdkReadyRef.current = false; // force re-poll
+          console.warn('[Tonstakers] Race: SDK reported ready but threw not-ready. Waiting 2s...');
           await new Promise(r => setTimeout(r, 2_000));
         } else {
-          throw err; // user rejected, network error, etc. — rethrow immediately
+          // Real error: user cancellation, network, etc. - throw immediately
+          throw err;
         }
       }
     }
-    throw lastErr ?? new Error('Stake failed after retries. Please try again.');
+
+    throw lastErr ?? new Error(
+      'Wallet timed out. Please disconnect and reconnect your wallet, then try again.'
+    );
   }
 
-  /** Stakes TON. Returns the onchain tx hash for the explorer link, or null on timeout. */
+  /** Stakes TON. Returns onchain tx hash or null. */
   const stake = async (amountNano: string): Promise<string | null> => {
     return withSdkRetry(async (sdk) => {
-      const before = await getLatestTxInfo(address ?? '');
+      const before = await getLatestTxInfo(address ?? '').catch(() => null);
       await sdk.stake(BigInt(amountNano));
       const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
       await Promise.all([refresh(), refreshBalance()]);
@@ -407,10 +371,10 @@ export function useTonstakers() {
     });
   };
 
-  /** Unstakes tsTON (standard). Returns the onchain tx hash or null. */
+  /** Unstakes tsTON (standard - next round). Returns onchain tx hash or null. */
   const unstake = async (amountNano: string): Promise<string | null> => {
     return withSdkRetry(async (sdk) => {
-      const before = await getLatestTxInfo(address ?? '');
+      const before = await getLatestTxInfo(address ?? '').catch(() => null);
       await sdk.unstake(BigInt(amountNano));
       const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
       await Promise.all([refresh(), refreshBalance()]);
@@ -418,10 +382,10 @@ export function useTonstakers() {
     });
   };
 
-  /** Unstakes tsTON instantly. Returns the onchain tx hash or null. */
+  /** Unstakes tsTON instantly. Returns onchain tx hash or null. */
   const unstakeInstant = async (amountNano: string): Promise<string | null> => {
     return withSdkRetry(async (sdk) => {
-      const before = await getLatestTxInfo(address ?? '');
+      const before = await getLatestTxInfo(address ?? '').catch(() => null);
       await sdk.unstakeInstant(BigInt(amountNano));
       const tx = await pollForNewTx(address ?? '', before?.lt ?? null);
       await Promise.all([refresh(), refreshBalance()]);
@@ -432,7 +396,6 @@ export function useTonstakers() {
 
   return {
     ...state,
-    // Expose real wallet TON nano balance as "Available" for the stake input
     availableBalance: walletBalanceNano,
     stake,
     unstake,
