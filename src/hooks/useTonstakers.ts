@@ -225,9 +225,12 @@ export function useTonstakers() {
     console.log(`[Tonstakers] Creating SDK instance (attempt ${retryCount + 1})`);
 
     const isMockKey = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
+    // If the SDK failed to initialize the first time, drop the custom API key and let Tonstakers use its fallback.
+    const disableKey = isMockKey || retryCount > 0;
+    
     const sdk = new Tonstakers({
       connector: tonConnectUI,
-      ...(isMockKey ? {} : { tonApiKey: TONAPI_KEY }),
+      ...(disableKey ? {} : { tonApiKey: TONAPI_KEY }),
       partnerCode: TONSTAKERS_PARTNER_CODE,
     });
 
@@ -254,7 +257,7 @@ export function useTonstakers() {
     // This handles the case where wallet is already connected on mount
     // (the 'initialized' event won't fire for already-connected wallets).
     const POLL_MS = 500;
-    const TIMEOUT_MS = 20_000;
+    const TIMEOUT_MS = retryCount === 0 ? 5_000 : 15_000;
     let elapsed = 0;
 
     const poll = setInterval(() => {
