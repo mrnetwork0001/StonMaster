@@ -87,7 +87,7 @@ export const LandingPage: React.FC = () => {
             <div className="landing-orb">
               <div className="landing-orb-inner">
                 <div className="landing-orb-core">
-                  <img src="https://ton.org/download/ton_logo.svg" alt="TON Logo" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  <img src="https://static.ston.fi/logo/ton_symbol.png" alt="TON Logo" style={{ width: '100%', height: '100%', objectFit: 'contain', padding: '20%', backgroundColor: '#fff', borderRadius: '50%' }} />
                 </div>
               </div>
             </div>
