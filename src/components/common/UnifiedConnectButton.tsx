@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTonConnectUI, TonConnectButton } from '@tonconnect/ui-react';
 import { GlassModal } from './GlassModal';
 import { useWallet } from '../../hooks/useWallet';
@@ -9,6 +9,13 @@ export const UnifiedConnectButton: React.FC = () => {
   const [showModal, setShowModal] = useState(false);
   const { address, isConnected } = useWallet();
   const [tonConnectUI] = useTonConnectUI();
+
+  // Auto-close the connect modal once the wallet successfully connects
+  useEffect(() => {
+    if (isConnected && showModal) {
+      setShowModal(false);
+    }
+  }, [isConnected, showModal]);
 
   // When connected - show address chip with disconnect dropdown
   if (isConnected && address) {
@@ -128,7 +135,7 @@ export const UnifiedConnectButton: React.FC = () => {
             <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
               Connect with Tonkeeper, MyTonWallet, or any TON-compatible wallet.
             </p>
-            <div onClick={() => setTimeout(() => setShowModal(false), 300)}>
+            <div>
               <TonConnectButton />
             </div>
           </div>

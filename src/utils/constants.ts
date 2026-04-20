@@ -52,7 +52,9 @@ export const OMNISTON_SANDBOX_URL = 'wss://omni-ws-sandbox.ston.fi';
 export const APP_NAME = 'StonMaster';
 export const DUST_THRESHOLD_USD = 1.0;
 export const DEFAULT_SLIPPAGE_BPS = 300; // 3%
-export const MANIFEST_URL = import.meta.env.VITE_MANIFEST_URL || '/tonconnect-manifest.json';
+// IMPORTANT: Must always be an absolute URL — Tonkeeper fetches this from outside
+// the browser context and cannot resolve relative paths.
+export const MANIFEST_URL = 'https://ston-master.vercel.app/tonconnect-manifest.json';
 export const TONAPI_KEY = import.meta.env.VITE_TONAPI_KEY || '';
 export const TONSTAKERS_PARTNER_CODE = Number(import.meta.env.VITE_TONSTAKERS_PARTNER_CODE) || 0;
 
