@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useTonConnectUI, TonConnectButton } from '@tonconnect/ui-react';
+import { useTonConnectUI } from '@tonconnect/ui-react';
 import { GlassModal } from './GlassModal';
 import { useWallet } from '../../hooks/useWallet';
 import { AppIcon } from './AppIcon';
@@ -106,41 +106,14 @@ export const UnifiedConnectButton: React.FC = () => {
 
   return (
     <>
-      {/* Connect Button - opens modal */}
+      {/* Connect Button - opens TonConnect Native Modal directly */}
       <button
         className="btn btn-primary"
-        onClick={() => setShowModal(true)}
+        onClick={() => tonConnectUI.openModal()}
         style={{ padding: 'var(--space-2) var(--space-6)' }}
       >
         Connect
       </button>
-
-      <GlassModal
-        isOpen={showModal}
-        onClose={() => setShowModal(false)}
-        title="Connect to StonMaster"
-      >
-        <div style={{ display: 'grid', gap: 'var(--space-5)' }}>
-          <div
-            style={{
-              background: 'var(--color-bg)',
-              borderRadius: 'var(--radius-lg)',
-              padding: 'var(--space-5)',
-              boxShadow: 'var(--neu-extruded-sm)',
-            }}
-          >
-            <h3 style={{ margin: '0 0 var(--space-2)', fontSize: '1rem', fontWeight: 700, color: 'var(--color-fg)' }}>
-              Connect TON Wallet
-            </h3>
-            <p style={{ fontSize: '0.875rem', color: 'var(--color-muted)', marginBottom: 'var(--space-4)', lineHeight: 1.6 }}>
-              Connect with Tonkeeper, MyTonWallet, or any TON-compatible wallet.
-            </p>
-            <div>
-              <TonConnectButton />
-            </div>
-          </div>
-        </div>
-      </GlassModal>
     </>
   );
 };
