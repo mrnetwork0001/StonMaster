@@ -362,14 +362,9 @@ export const EarnPage: React.FC = () => {
                   <AppIcon name="refresh" size={16} /> Retry Connection to Tonstakers
                 </span>
               </button>
-            ) : !tonstakers.sdkReady && !processing ? (
-              // SDK still initializing — show a non-blocking status indicator
-              <button className="btn btn-primary btn-lg btn-full" disabled>
-                <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-                  <AppIcon name="loader" size={16} className="animate-spin" /> Connecting to Tonstakers...
-                </span>
-              </button>
             ) : (
+              // Always show the action button — withSdkRetry handles internal SDK readiness.
+              // No more blocking "Connecting to Tonstakers..." disabled state.
               <button
                 className={`btn ${activeTab === 'stake' ? 'btn-accent' : 'btn-primary'} btn-lg btn-full`}
                 onClick={activeTab === 'stake' ? handleStake : handleUnstake}

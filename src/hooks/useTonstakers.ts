@@ -106,7 +106,6 @@ export function useTonstakers() {
   const sdkRef        = useRef<Tonstakers | null>(null);
   const sdkReadyRef   = useRef<boolean>(false);
   const refreshingRef = useRef<boolean>(false);
-  const [retryCount, setRetryCount] = useState(0);
 
   const [state, setState] = useState<TonstakersState>({
     sdkReady: false,
@@ -200,10 +199,10 @@ export function useTonstakers() {
   const refresh = refreshStats;
 
   const retryInit = useCallback(() => {
-    console.log('[Tonstakers] Manual retry triggered');
-    setState(prev => ({ ...prev, sdkInitFailed: false, sdkReady: false }));
+    console.log('[Tonstakers] Manual retry triggered — resetting failed state');
+    // Simply clear the failed flag; the keep-alive loop will re-detect readiness.
     sdkReadyRef.current = false;
-    setRetryCount(c => c + 1);
+    setState(prev => ({ ...prev, sdkInitFailed: false, sdkReady: false }));
   }, []);
 
   // ─── Pool stats fetch on mount and every 90s ─────────────────────────────
@@ -217,84 +216,92 @@ export function useTonstakers() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [address]);
 
-  // ─── SDK lifecycle ────────────────────────────────────────────────────────
+  // ─── SDK lifecycle: create ONCE, keep alive with a persistent loop ────────
+  //
+  // ROOT CAUSE FIX: The old pattern called setRetryCount() when the SDK wasn't
+  // ready, which caused the useEffect to re-run (because retryCount was a dep),
+  // destroying and recreating the SDK — and the cycle repeated after every stake.
+  //
+  // New pattern:
+  //   1. Create the SDK exactly once per tonConnectUI instance.
+  //   2. Run a 300ms keep-alive loop for the component's entire lifetime.
+  //   3. When sdk.ready goes false (deinitialized during a tx), just wait —
+  //      do NOT increment any counter, do NOT destroy the SDK.
+  //   4. Only show the retry button after 24s of *continuous* failure.
   useEffect(() => {
     if (!tonConnectUI) return;
 
+    console.log('[Tonstakers] Creating persistent SDK instance');
     setState(prev => ({ ...prev, sdkInitFailed: false }));
-    console.log(`[Tonstakers] Creating SDK instance (attempt ${retryCount + 1})`);
 
-    const isMockKey = !TONAPI_KEY || TONAPI_KEY === 'mock_tonapi_key_replace_me';
-    // If the SDK failed to initialize the first time, drop the custom API key and let Tonstakers use its fallback.
-    const disableKey = isMockKey || retryCount > 0;
-    
+    // Never pass tonApiKey — it causes ERR_BLOCKED_BY_CLIENT spam from analytics.ton.org
     const sdk = new Tonstakers({
       connector: tonConnectUI,
-      ...(disableKey ? {} : { tonApiKey: TONAPI_KEY }),
       partnerCode: TONSTAKERS_PARTNER_CODE,
     });
 
     sdkRef.current = sdk;
-    let destroyed = false;
+    let unmounted = false;
+    let failStreak = 0;           // consecutive not-ready ticks
+    const MAX_STREAK = 80;        // 80 × 300ms = 24s before giving up
 
-    const onInit = () => {
-      if (destroyed) return;
-      console.log('[Tonstakers] SDK initialized');
-      sdkReadyRef.current = true;
-      setState(prev => ({ ...prev, sdkReady: true, sdkInitFailed: false }));
-      refreshStats();
+    const markReady = () => {
+      if (unmounted) return;
+      failStreak = 0;
+      if (!sdkReadyRef.current) {
+        console.log('[Tonstakers] SDK ready ✓');
+        sdkReadyRef.current = true;
+        setState(prev => ({ ...prev, sdkReady: true, sdkInitFailed: false }));
+        refreshStats();
+      }
     };
 
+    // Eternal keep-alive — survives deinitialized events from transactions
+    const keepAlive = setInterval(() => {
+      if (unmounted) { clearInterval(keepAlive); return; }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ready = (sdk as any).ready === true || sdk.ready === true;
+      if (ready) {
+        markReady();
+      } else {
+        if (sdkReadyRef.current) {
+          // Transient loss — tx in-flight or wallet briefly disconnected
+          sdkReadyRef.current = false;
+          setState(prev => ({ ...prev, sdkReady: false }));
+          console.log('[Tonstakers] Transient readiness loss — will auto-recover');
+        }
+        failStreak++;
+        if (failStreak >= MAX_STREAK && !unmounted) {
+          console.error('[Tonstakers] SDK not ready for 24s — showing retry button');
+          clearInterval(keepAlive);
+          setState(prev => ({ ...prev, sdkInitFailed: true, loading: false }));
+        }
+      }
+    }, 300);
+
+    // Fast-path: fire immediately on the SDK's own events
+    const onInit   = () => markReady();
     const onDeinit = () => {
-      sdkReadyRef.current = false;
-      setState(prev => ({ ...prev, sdkReady: false }));
+      // Do nothing destructive — keep-alive handles recovery automatically
+      console.log('[Tonstakers] deinitialized event — keep-alive will recover');
     };
-
     sdk.addEventListener('initialized', onInit);
     sdk.addEventListener('deinitialized', onDeinit);
 
-    // ── Aggressive polling: check sdk.ready every 500ms for up to 20s ─────
-    // This handles the case where wallet is already connected on mount
-    // (the 'initialized' event won't fire for already-connected wallets).
-    const POLL_MS = 500;
-    const TIMEOUT_MS = retryCount === 0 ? 5_000 : 15_000;
-    let elapsed = 0;
-
-    const poll = setInterval(() => {
-      if (destroyed || sdkReadyRef.current) { clearInterval(poll); return; }
-      // Check sdk.ready
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      if ((sdk as any).ready === true || sdk.ready === true) {
-        clearInterval(poll);
-        onInit();
-        return;
-      }
-      elapsed += POLL_MS;
-      if (elapsed >= TIMEOUT_MS) {
-        clearInterval(poll);
-        if (!destroyed && !sdkReadyRef.current) {
-          if (retryCount < 5) {
-            console.warn(`[Tonstakers] SDK not ready after ${TIMEOUT_MS / 1000}s - auto-retry ${retryCount + 1}`);
-            setTimeout(() => { if (!destroyed) setRetryCount(c => c + 1); }, 500);
-          } else {
-            console.error('[Tonstakers] SDK exhausted retries - showing retry button');
-            setState(prev => ({ ...prev, sdkInitFailed: true, loading: false }));
-          }
-        }
-      }
-    }, POLL_MS);
+    // Synchronous check: catch wallets that are already connected at mount time
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((sdk as any).ready === true || sdk.ready === true) markReady();
 
     return () => {
-      destroyed = true;
-      clearInterval(poll);
+      unmounted = true;
+      clearInterval(keepAlive);
       sdk.removeEventListener('initialized', onInit);
       sdk.removeEventListener('deinitialized', onDeinit);
       sdkReadyRef.current = false;
-      // Keep sdkRef.current so withSdkRetry can detect it changing
-      if (sdkRef.current === sdk) sdkRef.current = null;
+      sdkRef.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tonConnectUI, retryCount]);
+  }, [tonConnectUI]); // ← ONLY re-runs if tonConnectUI changes. No more retryCount.
 
   useEffect(() => {
     refreshBalance();
@@ -319,25 +326,24 @@ export function useTonstakers() {
    * - Total timeout: 40 seconds
    */
   async function withSdkRetry<T>(fn: (sdk: Tonstakers) => Promise<T>): Promise<T> {
-    const deadline = Date.now() + 40_000;
+    const deadline = Date.now() + 15_000; // 15s total, plenty of time
     let lastErr: unknown;
 
     while (Date.now() < deadline) {
       const sdk = sdkRef.current;
 
-      // SDK not created yet - wait for it
+      // SDK not created yet - wait briefly
       if (!sdk) {
-        await new Promise(r => setTimeout(r, 800));
+        await new Promise(r => setTimeout(r, 200));
         continue;
       }
 
-      // SDK exists - check if ready
+      // SDK exists - check if ready (fast 200ms poll)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const isReady = sdkReadyRef.current || (sdk as any).ready === true || sdk.ready === true;
 
       if (!isReady) {
-        // Not ready yet - keep waiting
-        await new Promise(r => setTimeout(r, 1_000));
+        await new Promise(r => setTimeout(r, 200));
         continue;
       }
 
@@ -349,8 +355,8 @@ export function useTonstakers() {
           // Race condition: SDK reported ready but internal check disagrees
           lastErr = err;
           sdkReadyRef.current = false; // force re-poll
-          console.warn('[Tonstakers] Race: SDK reported ready but threw not-ready. Waiting 2s...');
-          await new Promise(r => setTimeout(r, 2_000));
+          console.warn('[Tonstakers] Race: SDK reported ready but threw not-ready. Retrying in 500ms...');
+          await new Promise(r => setTimeout(r, 500));
         } else {
           // Real error: user cancellation, network, etc. - throw immediately
           throw err;
